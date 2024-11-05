@@ -301,7 +301,7 @@ class RLOOTrainer(Trainer):
             with torch.no_grad():
                 queries = data["input_ids"].to(device)
                 print("For the purposes of debugging, these are the queries:", queries, data)
-                ground_truth = data["label"].to(device)
+                ground_truth = data["labels"].to(device)
                 queries = queries.repeat(args.rloo_k, 1)
                 ground_truth = ground_truth.repeat(args.rloo_k, 1)
                 context_length = queries.shape[1]
