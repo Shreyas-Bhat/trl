@@ -81,6 +81,7 @@ class RLOOTrainer(Trainer):
         ref_policy: nn.Module,
         reward_model: nn.Module,
         train_dataset: Dataset,
+        llm_decision_maker: nn.Module,
         data_collator: Optional[DataCollatorWithPadding] = None,
         eval_dataset: Optional[Union[Dataset, Dict[str, Dataset]]] = None,
         # less commonly used
@@ -97,6 +98,7 @@ class RLOOTrainer(Trainer):
         args = config
         self.processing_class = processing_class
         self.policy = policy
+        self.llm_decision_maker = llm_decision_maker
 
         self.policy.generation_config.eos_token_id = (
             None  # disable `pad_token_id` and `eos_token_id` because we just want to
@@ -221,6 +223,7 @@ class RLOOTrainer(Trainer):
             self.ref_policy = prepare_deepspeed(
                 self.ref_policy, args.per_device_train_batch_size, args.fp16, args.bf16
             )
+            self.llm_decision_maker = self.llm_decision_maker.to(self.accelerator.device)
             self.deepspeed = self.model
         else:
             self.ref_policy = self.ref_policy.to(self.accelerator.device)
@@ -297,7 +300,9 @@ class RLOOTrainer(Trainer):
             data = next(iter_dataloader)
             with torch.no_grad():
                 queries = data["input_ids"].to(device)
+                ground_truth = data["label"].to(device)
                 queries = queries.repeat(args.rloo_k, 1)
+                ground_truth = ground_truth.repeat(args.rloo_k, 1)
                 context_length = queries.shape[1]
                 query_responses = []
                 responses = []
@@ -317,6 +322,7 @@ class RLOOTrainer(Trainer):
 
                 for i in range(0, queries.shape[0], args.local_rollout_forward_batch_size):
                     query = queries[i : i + args.local_rollout_forward_batch_size]
+                    ground_truth_batch = ground_truth[i: i + args.local_rollout_forward_batch_size]
                     query_response = query_responses[i : i + args.local_rollout_forward_batch_size]
                     response = query_response[:, context_length:]
                     logits = logitss[i : i + args.local_rollout_forward_batch_size]
@@ -330,6 +336,9 @@ class RLOOTrainer(Trainer):
                     ref_logits /= args.temperature + 1e-7
                     ref_all_logprob = F.log_softmax(ref_logits, dim=-1)
                     ref_logprob = torch.gather(ref_all_logprob, 2, response.unsqueeze(-1)).squeeze(-1)
+                    llm_output = forward(self.llm_decision_maker, postprocessed_query_response, processing_class.pad_token_id)
+                    llm_scores = llm_output
+                    print(f"The following are the llm_scores: {llm_scores"})
                     del ref_output, ref_logits, ref_all_logprob
                     torch.cuda.empty_cache()
 
@@ -344,7 +353,7 @@ class RLOOTrainer(Trainer):
                     postprocessed_query_response = torch.cat((query, postprocessed_response), 1)
                     sequence_length = first_true_indices(postprocessed_response == processing_class.pad_token_id) - 1
                     _, score, _ = get_reward(
-                        reward_model, postprocessed_query_response, processing_class.pad_token_id, context_length
+                        reward_model, postprocessed_query_response, processing_class.pad_token_id, context_length, llm_scores=llm_scores, ground_truth=ground_truth_batch
                     )
 
                     responses.append(response)
@@ -359,6 +368,7 @@ class RLOOTrainer(Trainer):
                 ref_logprobs = torch.cat(ref_logprobs, 0)
                 sequence_lengths = torch.cat(sequence_lengths, 0)
                 scores = torch.cat(scores, 0)
+
                 del (logprob, ref_logprob, score)
                 torch.cuda.empty_cache()
                 gc.collect()
