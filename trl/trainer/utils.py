@@ -1067,7 +1067,7 @@ def first_true_indices(bools: torch.Tensor, dtype=torch.long):
 
 
 def get_reward(
-    model: torch.nn.Module, query_responses: torch.Tensor, pad_token_id: int, context_length: int
+    model: torch.nn.Module, query_responses: torch.Tensor, pad_token_id: int, context_length: int, llm_scores: torch.Tensor, ground_truth: torch.Tensor
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """
     Computes the reward logits and the rewards for a given model and query responses.
@@ -1081,6 +1081,10 @@ def get_reward(
             The token ID representing the pad token.
         context_length (`int`):
             The length of the context in the query responses.
+        llm_scores (`torch.Tensor`):
+            Scores/logits from the LLM decision maker.
+        ground_truth (`torch.Tensor`):
+            The ground truth sentiment labels to compute cross entropy against.
 
     Returns:
         tuple:
@@ -1106,12 +1110,11 @@ def get_reward(
     reward_logits = model.score(output.hidden_states[-1])
     sequence_lengths = first_true_indices(query_responses[:, context_length:] == pad_token_id) - 1 + context_length
     # https://github.com/huggingface/transformers/blob/dc68a39c8111217683bf49a4912d0c9018bab33d/src/transformers/models/gpt2/modeling_gpt2.py#L1454
+    llm_probabilities = llm_scores
+    cross_entropy = -torch.sum(ground_truth * torch.log(llm_probabilities + 1e-10), dim=-1)
     return (
         reward_logits,
-        reward_logits[
-            torch.arange(reward_logits.size(0), device=reward_logits.device),
-            sequence_lengths,
-        ].squeeze(-1),
+        cross_entropy,
         sequence_lengths,
     )
 
