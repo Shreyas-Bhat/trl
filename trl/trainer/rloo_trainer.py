@@ -339,7 +339,7 @@ class RLOOTrainer(Trainer):
                     ref_logprob = torch.gather(ref_all_logprob, 2, response.unsqueeze(-1)).squeeze(-1)
                     llm_output = forward(self.llm_decision_maker, postprocessed_query_response, processing_class.pad_token_id)
                     llm_scores = llm_output
-                    print(f"The following are the llm_scores: {llm_scores"})
+                    print(f"The following are the llm_scores: {llm_scores}")
                     del ref_output, ref_logits, ref_all_logprob
                     torch.cuda.empty_cache()
 
