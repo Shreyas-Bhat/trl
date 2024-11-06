@@ -521,7 +521,6 @@ class RLOOTrainer(Trainer):
             top_p=1.0,
             do_sample=True,
         )
-
         table = defaultdict(list)
         with unwrap_model_for_generation(self.model, self.accelerator) as unwrapped_model:
             for batch in self.eval_dataloader:
@@ -540,28 +539,85 @@ class RLOOTrainer(Trainer):
                     print("ground_truth", ground_truth)
                     ground_truth_batch = ground_truth
                     postprocessed_response = response
-                    if args.stop_token_id is not None:  # handle the edge case when stop_token_id exists but is 0
+                    
+                    if args.stop_token_id is not None:
                         postprocessed_response = truncate_response(
                             args.stop_token_id, processing_class.pad_token_id, response
                         )
-                    table["query"].extend(
-                        gather_object(processing_class.batch_decode(query, skip_special_tokens=True))
-                    )
-                    table["model response"].extend(
-                        gather_object(processing_class.batch_decode(postprocessed_response))
-                    )
-
+                    
+                    # Decode and gather queries and responses
+                    decoded_queries = processing_class.batch_decode(query, skip_special_tokens=True)
+                    decoded_responses = processing_class.batch_decode(postprocessed_response)
+                    
+                    # Process the query-response and get scores
                     postprocessed_query_response = torch.cat((query, postprocessed_response), 1)
                     llm_output = forward(self.llm_decision_maker, postprocessed_query_response, processing_class.pad_token_id)
                     llm_scores = llm_output
                     _, score, _ = get_reward(
-                        self.reward_model, postprocessed_query_response, processing_class.pad_token_id, context_length, llm_scores=llm_scores, ground_truth=ground_truth_batch
+                        self.reward_model, 
+                        postprocessed_query_response, 
+                        processing_class.pad_token_id, 
+                        context_length, 
+                        llm_scores=llm_scores, 
+                        ground_truth=ground_truth_batch
                     )
                     print("Score:", score)
-                    table["score"].extend(self.accelerator.gather(score.unsqueeze(0)).float().cpu().numpy()) #TODO: fix the unsqueezing
+                    
+                    # Gather all data consistently
+                    gathered_score = self.accelerator.gather(score.view(-1))  # Ensure score is properly shaped
+                    gathered_queries = self.accelerator.gather_for_metrics(decoded_queries)
+                    gathered_responses = self.accelerator.gather_for_metrics(decoded_responses)
+                    
+                    # Extend tables ensuring consistent lengths
+                    batch_size = len(gathered_score)
+                    table["query"].extend(gathered_queries[:batch_size])
+                    table["model response"].extend(gathered_responses[:batch_size])
+                    table["score"].extend(gathered_score.float().cpu().numpy())
+                    
+                    if sampling:
+                        break
 
-                if sampling:
-                    break
+
+        # table = defaultdict(list)
+        # with unwrap_model_for_generation(self.model, self.accelerator) as unwrapped_model:
+        #     for batch in self.eval_dataloader:
+        #         query = batch["input_ids"]
+        #         with torch.no_grad():
+        #             context_length = query.shape[1]
+        #             query_response, _ = batch_generation(
+        #                 unwrapped_model,
+        #                 query,
+        #                 query.shape[0],
+        #                 processing_class.pad_token_id,
+        #                 generation_config,
+        #             )
+        #             response = query_response[:, context_length:]
+        #             ground_truth = batch["labels"].to(response.device)
+        #             print("ground_truth", ground_truth)
+        #             ground_truth_batch = ground_truth
+        #             postprocessed_response = response
+        #             if args.stop_token_id is not None:  # handle the edge case when stop_token_id exists but is 0
+        #                 postprocessed_response = truncate_response(
+        #                     args.stop_token_id, processing_class.pad_token_id, response
+        #                 )
+        #             table["query"].extend(
+        #                 gather_object(processing_class.batch_decode(query, skip_special_tokens=True))
+        #             )
+        #             table["model response"].extend(
+        #                 gather_object(processing_class.batch_decode(postprocessed_response))
+        #             )
+
+        #             postprocessed_query_response = torch.cat((query, postprocessed_response), 1)
+        #             llm_output = forward(self.llm_decision_maker, postprocessed_query_response, processing_class.pad_token_id)
+        #             llm_scores = llm_output
+        #             _, score, _ = get_reward(
+        #                 self.reward_model, postprocessed_query_response, processing_class.pad_token_id, context_length, llm_scores=llm_scores, ground_truth=ground_truth_batch
+        #             )
+        #             print("Score:", score)
+        #             table["score"].extend(self.accelerator.gather(score.unsqueeze(0)).float().cpu().numpy()) #TODO: fix the unsqueezing
+
+        #         if sampling:
+        #             break
         df = pd.DataFrame(table)
 
         if self.accelerator.is_main_process:
