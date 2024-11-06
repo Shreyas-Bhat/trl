@@ -324,6 +324,7 @@ class RLOOTrainer(Trainer):
                 for i in range(0, queries.shape[0], args.local_rollout_forward_batch_size):
                     query = queries[i : i + args.local_rollout_forward_batch_size]
                     ground_truth_batch = ground_truth[i: i + args.local_rollout_forward_batch_size]
+                    print("ground_truth_batch ", ground_truth_batch.shape, args.local_rollout_forward_batch_size)
                     query_response = query_responses[i : i + args.local_rollout_forward_batch_size]
                     response = query_response[:, context_length:]
                     logits = logitss[i : i + args.local_rollout_forward_batch_size]
