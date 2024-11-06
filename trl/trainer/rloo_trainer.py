@@ -558,7 +558,7 @@ class RLOOTrainer(Trainer):
                         self.reward_model, postprocessed_query_response, processing_class.pad_token_id, context_length, llm_scores=llm_scores, ground_truth=ground_truth_batch
                     )
                     print("Score:", score)
-                    table["score"].extend(self.accelerator.gather(score).float().cpu().numpy())
+                    table["score"].extend(self.accelerator.gather(score.unsqueeze(0)).float().cpu().numpy()) #TODO: fix the unsqueezing
 
                 if sampling:
                     break
