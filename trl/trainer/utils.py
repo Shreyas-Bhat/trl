@@ -1112,7 +1112,7 @@ def get_reward(
     sequence_lengths = first_true_indices(query_responses[:, context_length:] == pad_token_id) - 1 + context_length
     # https://github.com/huggingface/transformers/blob/dc68a39c8111217683bf49a4912d0c9018bab33d/src/transformers/models/gpt2/modeling_gpt2.py#L1454
     # llm_probabilities = llm_scores
-    llm_probabilities = torch.tensor([[0.6, 0.4,0.5,0.5]]).to(ground_truth.device) #TODO: change to actual score
+    llm_probabilities = torch.zeros(4, 53).to(ground_truth.device) #TODO: change to actual score
     cross_entropy = -torch.sum(ground_truth * torch.log(llm_probabilities + 1e-10), dim=-1)
     return (
         reward_logits,
