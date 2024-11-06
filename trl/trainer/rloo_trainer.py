@@ -536,7 +536,8 @@ class RLOOTrainer(Trainer):
                     )
                     response = query_response[:, context_length:]
                     ground_truth = batch["labels"].to(response.device)
-                    ground_truth_batch = ground_truth[:, context_length:]
+                    print("ground_truth", ground_truth)
+                    ground_truth_batch = ground_truth
                     postprocessed_response = response
                     if args.stop_token_id is not None:  # handle the edge case when stop_token_id exists but is 0
                         postprocessed_response = truncate_response(
