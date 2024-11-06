@@ -391,7 +391,7 @@ class RLOOTrainer(Trainer):
                 # 4. compute rewards
                 kl = logprobs - ref_logprobs
                 non_score_reward = (-args.kl_coef * kl).sum(1)
-                print("Shape of scores and non_score", scores.shape, non_score_reward.shape) #TODO: remove
+                print("Shape of scores and non_score", scores, non_score_reward) #TODO: remove
                 rlhf_reward = scores + non_score_reward
 
                 # vectorized RLOO advantages implementation
