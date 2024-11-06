@@ -329,6 +329,7 @@ class RLOOTrainer(Trainer):
                     logits = logitss[i : i + args.local_rollout_forward_batch_size]
                     all_logprob = F.log_softmax(logits, dim=-1)
                     logprob = torch.gather(all_logprob, 2, response.unsqueeze(-1)).squeeze(-1)
+                    print("log prob and all logprob", all_logprob, logprob) 
                     del logits, all_logprob
                     torch.cuda.empty_cache()
 
