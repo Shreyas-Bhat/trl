@@ -353,7 +353,7 @@ class RLOOTrainer(Trainer):
                     sequence_length = first_true_indices(postprocessed_response == processing_class.pad_token_id) - 1
                     llm_output = forward(self.llm_decision_maker, postprocessed_query_response, processing_class.pad_token_id)
                     llm_scores = llm_output
-                    print(f"The following are the llm_scores: {llm_scores}")
+                    # print(f"The following are the llm_scores: {llm_scores}")
                     _, score, _ = get_reward(
                         reward_model, postprocessed_query_response, processing_class.pad_token_id, context_length, llm_scores=llm_scores, ground_truth=ground_truth_batch
                     )
@@ -392,7 +392,7 @@ class RLOOTrainer(Trainer):
                 # 4. compute rewards
                 kl = logprobs - ref_logprobs
                 non_score_reward = (-args.kl_coef * kl).sum(1)
-                print("Shape of scores and non_score", scores, non_score_reward) #TODO: remove
+                # print("Shape of scores and non_score", scores, non_score_reward) #TODO: remove
                 rlhf_reward = scores + non_score_reward
 
                 # vectorized RLOO advantages implementation
