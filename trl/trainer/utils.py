@@ -1114,7 +1114,8 @@ def get_reward(
     # llm_probabilities = llm_scores
     print("ground_truth shape:", ground_truth.shape)
     print("query_response shape:", query_responses.shape)
-    llm_probabilities = torch.tensor([0.6, 0.4]).to(ground_truth.device) #TODO: change to actual score
+    llm_probabilities = torch.zeros(ground_truth.shape[0]).to(ground_truth.device) #TODO: change to actual score
+    llm_probabilities.fill_(0.5)
     print("llm_probabilities shape:", llm_probabilities.shape)
     cross_entropy = -torch.sum(ground_truth * torch.log(llm_probabilities + 1e-10), dim=-1)
     return (
