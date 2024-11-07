@@ -30,7 +30,7 @@ from accelerate.utils import broadcast, gather_object
 from datasets import Dataset
 from torch.utils.data import DataLoader
 from transformers import (
-    AutoTokenizer
+    AutoTokenizer,
     BaseImageProcessor,
     DataCollatorWithPadding,
     FeatureExtractionMixin,
