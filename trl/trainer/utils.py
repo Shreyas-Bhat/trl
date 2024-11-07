@@ -1127,50 +1127,29 @@ def first_true_indices(bools: torch.Tensor, dtype=torch.long):
 #         sequence_lengths,
 #     )
 def get_reward(
-    model: torch.nn.Module, query_responses: torch.Tensor, pad_token_id: int, context_length: int, llm_scores: torch.Tensor, ground_truth: torch.Tensor, tokenizer=None
+    model: torch.nn.Module, query_responses: torch.Tensor, pad_token_id: int, context_length: int, llm_scores: torch.Tensor, ground_truth: torch.Tensor
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """
-    Computes the reward using LLM sentiment classification.
-    Returns 0.95 for positive sentiment, 0.05 for negative sentiment.
+    Computes the reward using LLM scores.
+    Returns 0.95 for positive sentiment (score == 'positive'), 0.05 for negative sentiment.
     """
     attention_mask = query_responses != pad_token_id
     sequence_lengths = first_true_indices(query_responses[:, context_length:] == pad_token_id) - 1 + context_length
     
-    # Convert tensor to text for LLM processing
-    texts = []
-    for i in range(query_responses.shape[0]):
-        # Only take non-pad tokens
-        valid_tokens = query_responses[i][attention_mask[i]]
-        # Convert tokens to text using provided tokenizer
-        if tokenizer:
-            text = tokenizer.decode(valid_tokens)
-        else:
-            # If no tokenizer provided, use raw logits/scores
-            llm_probabilities = torch.zeros(ground_truth.shape[0]).to(ground_truth.device)
-            for i, score in enumerate(llm_scores):
-                # Assuming score > 0.5 means positive sentiment
-                if score > 0.5:
-                    llm_probabilities[i] = 0.95
-                else:
-                    llm_probabilities[i] = 0.05
-            
-            cross_entropy = -torch.sum(ground_truth * torch.log(llm_probabilities + 1e-10), dim=-1)
-            return (
-                llm_probabilities,  # reward_logits
-                cross_entropy,
-                sequence_lengths,
-            )
-            
-        texts.append(text)
-    
-    # Get sentiment classifications from scores
+    # Convert string scores to binary-like probabilities
     llm_probabilities = torch.zeros(ground_truth.shape[0]).to(ground_truth.device)
     for i, score in enumerate(llm_scores):
-        # Assuming score > 0.5 means positive sentiment
-        if score > 0.5:
-            llm_probabilities[i] = 0.95
-        else:
-            llm_probabilities[i] = 0.05
+        # Check for positive/negative strings
+        if isinstance(score, str):
+            if 'positive' in score.lower():
+                llm_probabilities[i] = 0.95
+            else:  # assuming anything not positive is negative
+                llm_probabilities[i] = 0.05
+        else:  # if somehow we get numeric scores
+            if float(score) > 0.5:
+                llm_probabilities[i] = 0.95
+            else:
+                llm_probabilities[i] = 0.05
     
     # Compute cross entropy loss
     cross_entropy = -torch.sum(ground_truth * torch.log(llm_probabilities + 1e-10), dim=-1)
