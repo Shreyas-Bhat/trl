@@ -574,8 +574,8 @@ class RLOOTrainer(Trainer):
                     table["model response"].extend(gathered_responses[:batch_size])
                     table["score"].extend(gathered_score.float().cpu().numpy())
                     
-                    if sampling:
-                        break
+                if sampling:
+                    break
 
 
         # table = defaultdict(list)
