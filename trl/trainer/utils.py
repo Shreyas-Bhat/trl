@@ -1127,26 +1127,49 @@ def first_true_indices(bools: torch.Tensor, dtype=torch.long):
 #         sequence_lengths,
 #     )
 def get_reward(
-    model: torch.nn.Module, query_responses: torch.Tensor, pad_token_id: int, context_length: int, llm_scores: torch.Tensor, ground_truth: torch.Tensor
+    model: torch.nn.Module, query_responses: torch.Tensor, pad_token_id: int, context_length: int, llm_scores: torch.Tensor, ground_truth: torch.Tensor, tokenizer=None
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """
-    Computes the reward using LLM scores.
-    Returns 0.95 for positive sentiment (score == 'positive'), 0.05 for negative sentiment.
+    Computes the reward using LLM sentiment classification.
+    Returns 0.95 for positive sentiment, 0.05 for negative sentiment.
     """
     attention_mask = query_responses != pad_token_id
     sequence_lengths = first_true_indices(query_responses[:, context_length:] == pad_token_id) - 1 + context_length
     
-    # Convert string scores to binary-like probabilities
-    llm_probabilities = torch.zeros(ground_truth.shape[0]).to(ground_truth.device)
-    for i, score in enumerate(llm_scores):
-        # Check for positive/negative strings
-        if isinstance(score, str):
-            if 'positive' in score.lower():
-                llm_probabilities[i] = 0.95
-            else:  # assuming anything not positive is negative
-                llm_probabilities[i] = 0.05
-        else:  # if somehow we get numeric scores
-            if float(score) > 0.5:
+    # Convert tensor to text for LLM processing
+    texts = []
+    for i in range(query_responses.shape[0]):
+        # Only take non-pad tokens
+        valid_tokens = query_responses[i][attention_mask[i]]
+        if tokenizer:
+            text = tokenizer.decode(valid_tokens)
+            prompt = f"Is this text positive or negative? Answer with only 'positive' or 'negative': {text}"
+            texts.append(prompt)
+            
+    # Generate responses from model
+    device = next(model.parameters()).device
+    inputs = tokenizer(texts, return_tensors="pt", padding=True, truncation=True).to(device)
+    
+    with torch.no_grad():
+        outputs = model(**inputs)
+        # Get the logits for the next token prediction
+        logits = outputs.logits[:, -1, :]
+        
+        # Get probabilities using softmax
+        probs = torch.nn.functional.softmax(logits, dim=-1)
+        
+        # Find the tokens for 'positive' and 'negative'
+        positive_token = tokenizer.encode(' positive', add_special_tokens=False)[0]
+        negative_token = tokenizer.encode(' negative', add_special_tokens=False)[0]
+        
+        # Get probabilities for positive/negative
+        positive_probs = probs[:, positive_token]
+        negative_probs = probs[:, negative_token]
+        
+        # Convert to binary probabilities
+        llm_probabilities = torch.zeros(ground_truth.shape[0]).to(device)
+        for i in range(len(positive_probs)):
+            if positive_probs[i] > negative_probs[i]:
                 llm_probabilities[i] = 0.95
             else:
                 llm_probabilities[i] = 0.05
