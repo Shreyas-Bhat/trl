@@ -1113,8 +1113,8 @@ def get_reward(
     sequence_lengths = first_true_indices(query_responses[:, context_length:] == pad_token_id) - 1 + context_length
     # https://github.com/huggingface/transformers/blob/dc68a39c8111217683bf49a4912d0c9018bab33d/src/transformers/models/gpt2/modeling_gpt2.py#L1454
     # llm_probabilities = llm_scores
-    # print("ground_truth shape:", ground_truth.shape)
-    # print("query_response shape:", query_responses.shape)
+    print("ground_truth shape:", ground_truth.shape)
+    print("query_response shape:", query_responses.shape)
     llm_probabilities = torch.zeros(ground_truth.shape[0]).to(ground_truth.device) #TODO: change to actual score
     llm_probabilities.fill_(0.5)
     print("llm_probabilities shape:", llm_probabilities.shape)
