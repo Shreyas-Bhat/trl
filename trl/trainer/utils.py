@@ -1066,65 +1066,113 @@ def first_true_indices(bools: torch.Tensor, dtype=torch.long):
     return torch.min(zero_or_index, dim=-1).values
 
 
+# def get_reward(
+#     model: torch.nn.Module, query_responses: torch.Tensor, pad_token_id: int, context_length: int, llm_scores: torch.Tensor, ground_truth: torch.Tensor
+# ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+#     """
+#     Computes the reward logits and the rewards for a given model and query responses.
+
+#     Args:
+#         model (`torch.nn.Module`):
+#             The model used to compute the reward logits.
+#         query_responses (`torch.Tensor`):
+#             The tensor containing the query responses.
+#         pad_token_id (`int`):
+#             The token ID representing the pad token.
+#         context_length (`int`):
+#             The length of the context in the query responses.
+#         llm_scores (`torch.Tensor`):
+#             Scores/logits from the LLM decision maker.
+#         ground_truth (`torch.Tensor`):
+#             The ground truth sentiment labels to compute cross entropy against.
+
+#     Returns:
+#         tuple:
+#             - `reward_logits` (`torch.Tensor`):
+#                 The logits for the reward model.
+#             - `final_rewards` (`torch.Tensor`):
+#                 The final rewards for each query response.
+#             - `sequence_lengths` (`torch.Tensor`):
+#                 The lengths of the sequences in the query responses.
+#     """
+#     attention_mask = query_responses != pad_token_id
+#     position_ids = attention_mask.cumsum(1) - attention_mask.long()  # exclusive cumsum
+#     lm_backbone = getattr(model, model.base_model_prefix)
+#     input_ids = torch.masked_fill(query_responses, ~attention_mask, 0)
+#     # output = lm_backbone(
+#     #     input_ids=input_ids,
+#     #     attention_mask=attention_mask,
+#     #     position_ids=position_ids,
+#     #     return_dict=True,
+#     #     output_hidden_states=True,
+#     #     use_cache=False,  # otherwise mistral-based RM would error out
+#     # ) TODO: commented out because didnt make sense
+
+#     output = lm_backbone()
+#     print("output", output)
+#     # reward_logits = model.score(output.hidden_states[-1])
+#     reward_logits = 0.5 #TODO: change to actual score
+#     sequence_lengths = first_true_indices(query_responses[:, context_length:] == pad_token_id) - 1 + context_length
+#     # https://github.com/huggingface/transformers/blob/dc68a39c8111217683bf49a4912d0c9018bab33d/src/transformers/models/gpt2/modeling_gpt2.py#L1454
+#     # llm_probabilities = llm_scores
+#     print("ground_truth shape:", ground_truth.shape)
+#     print("query_response shape:", query_responses.shape)
+#     llm_probabilities = torch.zeros(ground_truth.shape[0]).to(ground_truth.device) #TODO: change to actual score
+#     llm_probabilities.fill_(0.5)
+#     print("llm_probabilities shape:", llm_probabilities.shape)
+#     cross_entropy = -torch.sum(ground_truth * torch.log(llm_probabilities + 1e-10), dim=-1)
+#     return (
+#         reward_logits,
+#         cross_entropy,
+#         sequence_lengths,
+#     )
 def get_reward(
     model: torch.nn.Module, query_responses: torch.Tensor, pad_token_id: int, context_length: int, llm_scores: torch.Tensor, ground_truth: torch.Tensor
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """
-    Computes the reward logits and the rewards for a given model and query responses.
-
-    Args:
-        model (`torch.nn.Module`):
-            The model used to compute the reward logits.
-        query_responses (`torch.Tensor`):
-            The tensor containing the query responses.
-        pad_token_id (`int`):
-            The token ID representing the pad token.
-        context_length (`int`):
-            The length of the context in the query responses.
-        llm_scores (`torch.Tensor`):
-            Scores/logits from the LLM decision maker.
-        ground_truth (`torch.Tensor`):
-            The ground truth sentiment labels to compute cross entropy against.
-
-    Returns:
-        tuple:
-            - `reward_logits` (`torch.Tensor`):
-                The logits for the reward model.
-            - `final_rewards` (`torch.Tensor`):
-                The final rewards for each query response.
-            - `sequence_lengths` (`torch.Tensor`):
-                The lengths of the sequences in the query responses.
+    Computes the reward using LLM sentiment classification.
+    Returns 0.95 for positive sentiment, 0.05 for negative sentiment.
     """
     attention_mask = query_responses != pad_token_id
-    position_ids = attention_mask.cumsum(1) - attention_mask.long()  # exclusive cumsum
-    lm_backbone = getattr(model, model.base_model_prefix)
-    input_ids = torch.masked_fill(query_responses, ~attention_mask, 0)
-    output = lm_backbone(
-        input_ids=input_ids,
-        attention_mask=attention_mask,
-        position_ids=position_ids,
-        return_dict=True,
-        output_hidden_states=True,
-        use_cache=False,  # otherwise mistral-based RM would error out
-    )
-    print("output", output)
-    # reward_logits = model.score(output.hidden_states[-1])
-    reward_logits = 0.5 #TODO: change to actual score
     sequence_lengths = first_true_indices(query_responses[:, context_length:] == pad_token_id) - 1 + context_length
-    # https://github.com/huggingface/transformers/blob/dc68a39c8111217683bf49a4912d0c9018bab33d/src/transformers/models/gpt2/modeling_gpt2.py#L1454
-    # llm_probabilities = llm_scores
-    print("ground_truth shape:", ground_truth.shape)
-    print("query_response shape:", query_responses.shape)
-    llm_probabilities = torch.zeros(ground_truth.shape[0]).to(ground_truth.device) #TODO: change to actual score
-    llm_probabilities.fill_(0.5)
-    print("llm_probabilities shape:", llm_probabilities.shape)
+    
+    # Convert tensor to text for LLM processing
+    texts = []
+    for i in range(query_responses.shape[0]):
+        # Only take non-pad tokens
+        valid_tokens = query_responses[i][attention_mask[i]]
+        # Convert tokens to text using model's tokenizer
+        text = model.tokenizer.decode(valid_tokens)
+        texts.append(text)
+    
+    # Get sentiment classifications from LLM
+    llm_probabilities = []
+    for text in texts:
+        # Prompt for sentiment classification
+        prompt = f"Classify the sentiment of the following text as positive or negative. Just respond with 'positive' or 'negative': {text}"
+        response = model.llm(prompt)  # Assuming model has an llm attribute
+        
+        # Convert response to probability
+        if 'positive' in response.lower():
+            prob = 0.95
+        else:  # negative
+            prob = 0.05
+        llm_probabilities.append(prob)
+    
+    # Convert to tensor
+    llm_probabilities = torch.tensor(llm_probabilities).to(ground_truth.device)
+    
+    # Compute cross entropy loss
     cross_entropy = -torch.sum(ground_truth * torch.log(llm_probabilities + 1e-10), dim=-1)
+    
+    # For reward_logits, we can use the same probabilities
+    reward_logits = llm_probabilities
+
     return (
         reward_logits,
         cross_entropy,
         sequence_lengths,
     )
-
 
 def forward(
     model: torch.nn.Module,
