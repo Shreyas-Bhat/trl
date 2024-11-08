@@ -578,6 +578,7 @@ class RLOOTrainer(Trainer):
                     # min_length = min(len(gathered_queries), len(gathered_responses), len(gathered_scores))
                     
                     # Extend the table with consistent lengths
+                    print("gathered_queries,gathered_responses", gathered_queries, gathered_responses)
                     table["query"].extend(gathered_queries)
                     table["model response"].extend(gathered_responses)
                     table["score"].extend(gathered_scores)
