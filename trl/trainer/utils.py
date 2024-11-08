@@ -1441,6 +1441,7 @@ def batch_generation(
             pad_token_id,
             generation_config,
         )
+        print("query response, maybe summary", query_response)
         query_responses.append(query_response)
         logitss.append(logits)
 
