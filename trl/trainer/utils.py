@@ -1154,7 +1154,7 @@ def get_reward(
     with torch.no_grad():
         # print("inputs", **inputs)
         outputs = model(**inputs)
-        print("outputs", outputs.shape)
+        print("outputs", outputs.logits.shape)
         # Get the logits for the next token prediction
         logits = outputs.logits[:, -1, :]
         
