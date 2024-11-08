@@ -537,6 +537,7 @@ class RLOOTrainer(Trainer):
                         generation_config,
                     )
                     response = query_response[:, context_length:]
+                    print("query_response, response", query_response.shape, response.shape)
                     ground_truth = batch["labels"].to(response.device)
                     
                     postprocessed_response = response
@@ -550,7 +551,9 @@ class RLOOTrainer(Trainer):
                     decoded_responses = processing_class.batch_decode(postprocessed_response)
                     
                     # Get LLM scores
+                    print("query, postprocessed_response", query.shape, postprocessed_response.shape)
                     postprocessed_query_response = torch.cat((query, postprocessed_response), 1)
+                    print("postprocessed_query_response", postprocessed_query_response.shape)
                     llm_output = forward(self.llm_decision_maker, postprocessed_query_response, processing_class.pad_token_id)
                     llm_scores = llm_output
                     
