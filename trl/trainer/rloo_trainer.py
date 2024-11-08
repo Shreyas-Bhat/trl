@@ -321,6 +321,14 @@ class RLOOTrainer(Trainer):
                         processing_class.pad_token_id,
                         generation_config,
                     )
+                    print("\nQuery-Response Pairs:")
+                    original_queries = processing_class.batch_decode(queries, skip_special_tokens=True)
+                    generated_responses = processing_class.batch_decode(query_responses, skip_special_tokens=True)
+                    for idx, (query, response) in enumerate(zip(original_queries, generated_responses)):
+                        print(f"\nPair {idx+1}:")
+                        print(f"Query: {query}")
+                        response_only = response[len(query):].strip()
+                        print(f"Generated Response: {response_only}")
 
                 for i in range(0, queries.shape[0], args.local_rollout_forward_batch_size):
                     query = queries[i : i + args.local_rollout_forward_batch_size]
