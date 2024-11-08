@@ -556,7 +556,7 @@ class RLOOTrainer(Trainer):
                     print("postprocessed_query_response", postprocessed_query_response.shape)
                     llm_output = forward(self.llm_decision_maker, postprocessed_query_response, processing_class.pad_token_id)
                     llm_scores = llm_output
-                    print("llm_scores", llm_scores.shape)
+                    print("llm_scores", llm_scores)
                     
                     # Get reward scores
                     _, score, _ = get_reward(
