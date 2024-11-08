@@ -361,7 +361,7 @@ class RLOOTrainer(Trainer):
                     # Response Processing 2. run reward model on the truncated responses
                     postprocessed_query_response = torch.cat((query, postprocessed_response), 1)
                     # sequence_length = first_true_indices(postprocessed_response == processing_class.pad_token_id) - 1 #TODO: changing this line 
-                    sequence_length = first_true_indices(postprocessed_response == processing_class.pad_token_id)
+                    sequence_length = first_true_indices(postprocessed_response == processing_class.pad_token_id) - 1
                     llm_output = forward(self.llm_decision_maker, postprocessed_query_response, processing_class.pad_token_id)
                     llm_scores = llm_output
                     # print(f"The following are the llm_scores: {llm_scores}")
@@ -562,6 +562,15 @@ class RLOOTrainer(Trainer):
                     # Get LLM scores
                     # print("query, postprocessed_response", query.shape, postprocessed_response.shape)
                     postprocessed_query_response = torch.cat((query, postprocessed_response), 1)
+                    decoded_sequences = processing_class.batch_decode(postprocessed_query_response, skip_special_tokens=True)
+                    print("\nFull Query-Response Pairs after processing:")
+                    for idx, sequence in enumerate(decoded_sequences):
+                        print(f"\nPair {idx + 1}:")
+                        print(f"Full sequence: {sequence}")
+                        query_text = processing_class.batch_decode(query[idx:idx+1], skip_special_tokens=True)[0]
+                        response_text = sequence[len(query_text):]
+                        print(f"Query part: {query_text}")
+                        print(f"Response part: {response_text}")
                     # print("postprocessed_query_response", postprocessed_query_response.shape)
                     llm_output = forward(self.llm_decision_maker, postprocessed_query_response, processing_class.pad_token_id)
                     llm_scores = llm_output
