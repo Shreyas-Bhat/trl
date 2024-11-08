@@ -537,7 +537,7 @@ class RLOOTrainer(Trainer):
                         generation_config,
                     )
                     response = query_response[:, context_length:]
-                    print("query_response, response", query_response.shape, response.shape)
+                    # print("query_response, response", query_response.shape, response.shape)
                     ground_truth = batch["labels"].to(response.device)
                     
                     postprocessed_response = response
@@ -551,12 +551,12 @@ class RLOOTrainer(Trainer):
                     decoded_responses = processing_class.batch_decode(postprocessed_response)
                     
                     # Get LLM scores
-                    print("query, postprocessed_response", query.shape, postprocessed_response.shape)
+                    # print("query, postprocessed_response", query.shape, postprocessed_response.shape)
                     postprocessed_query_response = torch.cat((query, postprocessed_response), 1)
-                    print("postprocessed_query_response", postprocessed_query_response.shape)
+                    # print("postprocessed_query_response", postprocessed_query_response.shape)
                     llm_output = forward(self.llm_decision_maker, postprocessed_query_response, processing_class.pad_token_id)
                     llm_scores = llm_output
-                    print("llm_scores", llm_scores)
+                    # print("llm_scores", llm_scores)
                     
                     # Get reward scores
                     _, score, _ = get_reward(
@@ -582,7 +582,7 @@ class RLOOTrainer(Trainer):
                     # min_length = min(len(gathered_queries), len(gathered_responses), len(gathered_scores))
                     
                     # Extend the table with consistent lengths
-                    print("gathered_queries,gathered_responses", gathered_queries, gathered_responses)
+                    # print("gathered_queries,gathered_responses", gathered_queries, gathered_responses)
                     table["query"].extend(gathered_queries)
                     table["model response"].extend(gathered_responses)
                     table["score"].extend(gathered_scores)
