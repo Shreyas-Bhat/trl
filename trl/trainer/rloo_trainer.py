@@ -361,7 +361,7 @@ class RLOOTrainer(Trainer):
                     # Response Processing 2. run reward model on the truncated responses
                     postprocessed_query_response = torch.cat((query, postprocessed_response), 1)
                     # sequence_length = first_true_indices(postprocessed_response == processing_class.pad_token_id) - 1 #TODO: changing this line 
-                    sequence_length = first_true_indices(postprocessed_response == processing_class.pad_token_id) - 1
+                    sequence_length = first_true_indices(postprocessed_response == processing_class.pad_token_id)
                     llm_output = forward(self.llm_decision_maker, postprocessed_query_response, processing_class.pad_token_id)
                     llm_scores = llm_output
                     # print(f"The following are the llm_scores: {llm_scores}")
