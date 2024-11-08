@@ -523,6 +523,7 @@ class RLOOTrainer(Trainer):
             do_sample=True,
         )
         table = defaultdict(list)
+        
         with unwrap_model_for_generation(self.model, self.accelerator) as unwrapped_model:
             for batch in self.eval_dataloader:
                 query = batch["input_ids"]
@@ -544,40 +545,52 @@ class RLOOTrainer(Trainer):
                             args.stop_token_id, processing_class.pad_token_id, response
                         )
                     
-                    # Decode before gathering
+                    # Decode queries and responses
                     decoded_queries = processing_class.batch_decode(query, skip_special_tokens=True)
                     decoded_responses = processing_class.batch_decode(postprocessed_response)
                     
+                    # Get LLM scores
                     postprocessed_query_response = torch.cat((query, postprocessed_response), 1)
                     llm_output = forward(self.llm_decision_maker, postprocessed_query_response, processing_class.pad_token_id)
                     llm_scores = llm_output
-                    ground_truth_batch = ground_truth
+                    
+                    # Get reward scores
                     _, score, _ = get_reward(
                         self.reward_model, 
                         postprocessed_query_response, 
                         processing_class.pad_token_id, 
                         context_length, 
                         llm_scores=llm_scores, 
-                        ground_truth=ground_truth_batch,
-                        tokenizer = AutoTokenizer.from_pretrained("facebook/opt-350m")
+                        ground_truth=ground_truth,
+                        tokenizer=AutoTokenizer.from_pretrained("facebook/opt-350m")
                     )
                     
-                    # Gather all tensors
-                    gathered_queries = gather_object(decoded_queries)  # Use gather_object instead
-                    gathered_responses = gather_object(decoded_responses)  # Use gather_object instead
-                    gathered_scores = self.accelerator.gather(score).float().cpu().numpy()
+                    # Ensure score is properly shaped and gathered
+                    score = score.view(-1)  # Reshape to 1D
+                    gathered_scores = self.accelerator.gather(score)
+                    gathered_scores = gathered_scores.float().cpu().numpy().tolist()  # Convert to list
                     
-                    # Extend the table with full batches
-                    table["query"].extend(gathered_queries)
-                    table["model response"].extend(gathered_responses)
-                    table["score"].extend(gathered_scores)
+                    # Gather queries and responses
+                    gathered_queries = gather_object(decoded_queries)
+                    gathered_responses = gather_object(decoded_responses)
+                    
+                    # Make sure all gathered data has the same length
+                    # min_length = min(len(gathered_queries), len(gathered_responses), len(gathered_scores))
+                    
+                    # Extend the table with consistent lengths
+                    table["query"].extend(gathered_queries[:min_length])
+                    table["model response"].extend(gathered_responses[:min_length])
+                    table["score"].extend(gathered_scores[:min_length])
+                    
+                    # Print shapes for debugging
+                    print(f"Gathered lengths - queries: {len(gathered_queries)}, responses: {len(gathered_responses)}, scores: {len(gathered_scores)}")
                 
                 if sampling:
                     break
         
         df = pd.DataFrame(table)
         if self.accelerator.is_main_process:
-            print_rich_table(df.iloc[0:5])  # Show first 5 rows
+            print_rich_table(df.iloc[0:5])
             if "wandb" in args.report_to:
                 import wandb
                 if wandb.run is not None:
