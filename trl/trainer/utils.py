@@ -1441,8 +1441,11 @@ def batch_generation(
             pad_token_id,
             generation_config,
         )
-        print("query response, maybe summary", query_response)
-        query_responses.append(query_response)
+        # print("query response, maybe summary", query_response)
+        # query_responses.append(query_response) TODO: made changes only returning responses
+        context_length = query.shape[1]
+        response = query_response[:, context_length:]
+        query_responses.append(response)
         logitss.append(logits)
 
     # padding tensors
