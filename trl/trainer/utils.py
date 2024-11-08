@@ -1170,13 +1170,13 @@ def get_reward(
         llm_probabilities = torch.zeros(ground_truth.shape[0]).to(device)
         for i in range(len(positive_probs)):
             if positive_probs[i] > negative_probs[i]:
-                llm_probabilities[i] = 0.95
+                llm_probabilities[i] = 0.80
             else:
-                llm_probabilities[i] = 0.05
+                llm_probabilities[i] = 0.15
     
     # Compute cross entropy loss
     print("Ground truth, llm_probabilities", ground_truth, llm_probabilities)
-    cross_entropy = -torch.sum(ground_truth * torch.log(llm_probabilities + 1e-10), dim=-1)
+    cross_entropy = -torch.sum(ground_truth * torch.log(llm_probabilities), dim=-1)
     print("cross_entropy", cross_entropy)
     
     return (
