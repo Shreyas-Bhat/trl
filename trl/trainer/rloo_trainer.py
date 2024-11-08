@@ -578,9 +578,9 @@ class RLOOTrainer(Trainer):
                     # min_length = min(len(gathered_queries), len(gathered_responses), len(gathered_scores))
                     
                     # Extend the table with consistent lengths
-                    table["query"].extend(gathered_queries[:min_length])
-                    table["model response"].extend(gathered_responses[:min_length])
-                    table["score"].extend(gathered_scores[:min_length])
+                    table["query"].extend(gathered_queries)
+                    table["model response"].extend(gathered_responses)
+                    table["score"].extend(gathered_scores)
                     
                     # Print shapes for debugging
                     print(f"Gathered lengths - queries: {len(gathered_queries)}, responses: {len(gathered_responses)}, scores: {len(gathered_scores)}")
