@@ -325,13 +325,13 @@ class RLOOTrainer(Trainer):
                 for i in range(0, queries.shape[0], args.local_rollout_forward_batch_size):
                     query = queries[i : i + args.local_rollout_forward_batch_size]
                     ground_truth_batch = ground_truth[i: i + args.local_rollout_forward_batch_size]
-                    print("ground_truth_batch ", ground_truth_batch.shape, args.local_rollout_forward_batch_size)
+                    # print("ground_truth_batch ", ground_truth_batch.shape, args.local_rollout_forward_batch_size)
                     query_response = query_responses[i : i + args.local_rollout_forward_batch_size]
                     response = query_response[:, context_length:]
                     logits = logitss[i : i + args.local_rollout_forward_batch_size]
                     all_logprob = F.log_softmax(logits, dim=-1)
                     logprob = torch.gather(all_logprob, 2, response.unsqueeze(-1)).squeeze(-1)
-                    print("log prob and all logprob", all_logprob.shape, logprob.shape) 
+                    # print("log prob and all logprob", all_logprob.shape, logprob.shape) 
                     del logits, all_logprob
                     torch.cuda.empty_cache()
 
@@ -537,7 +537,7 @@ class RLOOTrainer(Trainer):
                     )
                     response = query_response[:, context_length:]
                     ground_truth = batch["labels"].to(response.device)
-                    print("ground_truth", ground_truth)
+                    # print("ground_truth", ground_truth)
                     ground_truth_batch = ground_truth
                     postprocessed_response = response
                     
@@ -563,7 +563,7 @@ class RLOOTrainer(Trainer):
                         ground_truth=ground_truth_batch,
                         tokenizer = AutoTokenizer.from_pretrained("facebook/opt-350m")
                     )
-                    print("Score:", score)
+                    # print("Score:", score)
                     
                     # Gather all data consistently
                     gathered_score = self.accelerator.gather(score.view(-1))  # Ensure score is properly shaped
