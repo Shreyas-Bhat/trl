@@ -551,7 +551,7 @@ class RLOOTrainer(Trainer):
                     postprocessed_query_response = torch.cat((query, postprocessed_response), 1)
                     llm_output = forward(self.llm_decision_maker, postprocessed_query_response, processing_class.pad_token_id)
                     llm_scores = llm_output
-                    
+                    ground_truth_batch = ground_truth
                     _, score, _ = get_reward(
                         self.reward_model, 
                         postprocessed_query_response, 
