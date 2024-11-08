@@ -357,7 +357,7 @@ class RLOOTrainer(Trainer):
                     llm_scores = llm_output
                     # print(f"The following are the llm_scores: {llm_scores}")
                     _, score, _ = get_reward(
-                        reward_model, postprocessed_query_response, processing_class.pad_token_id, context_length, llm_scores=llm_scores, ground_truth=ground_truth_batch, tokenizer=AutoTokenizer.from_pretrained("facebook/opt-350m")
+                        reward_model, postprocessed_query_response, processing_class.pad_token_id, context_length, llm_scores=llm_scores, ground_truth=ground_truth_batch, tokenizer=AutoTokenizer.from_pretrained("Qwen/Qwen2-0.5B")
                     )
 
                     responses.append(response)
@@ -566,7 +566,7 @@ class RLOOTrainer(Trainer):
                         context_length, 
                         llm_scores=llm_scores, 
                         ground_truth=ground_truth,
-                        tokenizer=AutoTokenizer.from_pretrained("facebook/opt-350m")
+                        tokenizer=AutoTokenizer.from_pretrained("Qwen/Qwen2-0.5B")
                     )
                     
                     # Ensure score is properly shaped and gathered
