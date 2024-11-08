@@ -321,14 +321,14 @@ class RLOOTrainer(Trainer):
                         processing_class.pad_token_id,
                         generation_config,
                     )
-                    print("\nQuery-Response Pairs:")
-                    original_queries = processing_class.batch_decode(queries, skip_special_tokens=True)
-                    generated_responses = processing_class.batch_decode(query_responses, skip_special_tokens=True)
-                    for idx, (query, response) in enumerate(zip(original_queries, generated_responses)):
-                        print(f"\nPair {idx+1}:")
-                        print(f"Query: {query}")
-                        response_only = response[len(query):].strip()
-                        print(f"Generated Response: {response_only}")
+                    # print("\nQuery-Response Pairs:")
+                    # original_queries = processing_class.batch_decode(queries, skip_special_tokens=True)
+                    # generated_responses = processing_class.batch_decode(query_responses, skip_special_tokens=True)
+                    # for idx, (query, response) in enumerate(zip(original_queries, generated_responses)):
+                    #     print(f"\nPair {idx+1}:")
+                    #     print(f"Query: {query}")
+                    #     response_only = response[len(query):].strip()
+                    #     print(f"Generated Response: {response_only}")
 
                 for i in range(0, queries.shape[0], args.local_rollout_forward_batch_size):
                     query = queries[i : i + args.local_rollout_forward_batch_size]
@@ -360,6 +360,26 @@ class RLOOTrainer(Trainer):
 
                     # Response Processing 2. run reward model on the truncated responses
                     postprocessed_query_response = torch.cat((query, postprocessed_response), 1)
+                    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2-0.5B")
+                    # Decode and print the components separately
+                    print("\n=== Query-Response Components ===")
+                    print("1. Original Query:")
+                    query_text = tokenizer.batch_decode(query, skip_special_tokens=True)
+                    for i, q in enumerate(query_text):
+                        print(f"Query {i+1}: {q}")
+
+                    print("\n2. Processed Response:")
+                    response_text = tokenizer.batch_decode(postprocessed_response, skip_special_tokens=True)
+                    for i, r in enumerate(response_text):
+                        print(f"Response {i+1}: {r}")
+
+                    print("\n3. Full Concatenated Query-Response:")
+                    full_text = tokenizer.batch_decode(postprocessed_query_response, skip_special_tokens=True)
+                    for i, text in enumerate(full_text):
+                        print(f"\nPair {i+1}:")
+                        print("=" * 50)
+                        print(text)
+                        print("=" * 50)
                     # sequence_length = first_true_indices(postprocessed_response == processing_class.pad_token_id) - 1 #TODO: changing this line 
                     sequence_length = first_true_indices(postprocessed_response == processing_class.pad_token_id) - 1
                     llm_output = forward(self.llm_decision_maker, postprocessed_query_response, processing_class.pad_token_id)
@@ -563,14 +583,14 @@ class RLOOTrainer(Trainer):
                     # print("query, postprocessed_response", query.shape, postprocessed_response.shape)
                     postprocessed_query_response = torch.cat((query, postprocessed_response), 1)
                     decoded_sequences = processing_class.batch_decode(postprocessed_query_response, skip_special_tokens=True)
-                    print("\nFull Query-Response Pairs after processing:")
-                    for idx, sequence in enumerate(decoded_sequences):
-                        print(f"\nPair {idx + 1}:")
-                        print(f"Full sequence: {sequence}")
-                        query_text = processing_class.batch_decode(query[idx:idx+1], skip_special_tokens=True)[0]
-                        response_text = sequence[len(query_text):]
-                        print(f"Query part: {query_text}")
-                        print(f"Response part: {response_text}")
+                    # print("\nFull Query-Response Pairs after processing:")
+                    # for idx, sequence in enumerate(decoded_sequences):
+                    #     print(f"\nPair {idx + 1}:")
+                    #     print(f"Full sequence: {sequence}")
+                    #     query_text = processing_class.batch_decode(query[idx:idx+1], skip_special_tokens=True)[0]
+                    #     response_text = sequence[len(query_text):]
+                    #     print(f"Query part: {query_text}")
+                    #     print(f"Response part: {response_text}")
                     # print("postprocessed_query_response", postprocessed_query_response.shape)
                     llm_output = forward(self.llm_decision_maker, postprocessed_query_response, processing_class.pad_token_id)
                     llm_scores = llm_output
