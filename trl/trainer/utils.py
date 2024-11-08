@@ -1148,13 +1148,13 @@ def get_reward(
             
     # Generate responses from model
     device = next(model.parameters()).device
-    print("texts",texts)
+    # print("texts",texts)
     inputs = tokenizer(texts, return_tensors="pt", padding=True, truncation=True).to(device)
     
     with torch.no_grad():
         # print("inputs", **inputs)
         outputs = model(**inputs)
-        print("outputs", outputs.logits.shape)
+        # print("outputs", outputs.logits.shape)
         # Get the logits for the next token prediction
         logits = outputs.logits[:, -1, :]
         
