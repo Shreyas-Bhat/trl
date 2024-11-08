@@ -1178,9 +1178,14 @@ def get_reward(
                 llm_probabilities[i] = 0.15
     
     # Compute cross entropy loss
-    # print("Ground truth, llm_probabilities", ground_truth, llm_probabilities)
-    cross_entropy = -torch.sum(ground_truth * torch.log(llm_probabilities), dim=-1)
-    print("cross_entropy", cross_entropy)
+    # print("Ground truth, llm_probabilities", ground_truth.shape, llm_probabilities.shape)
+    ground_truth = ground_truth.float().view(-1,1)
+    llm_probabilities = llm_probabilities.float().view(-1,1)
+    epsilon = 1e-7
+    # cross_entropy = -torch.sum(ground_truth * torch.log(llm_probabilities), dim=-1)
+    cross_entropy = -ground_truth * torch.log(llm_probabilities + epsilon) - (1 - ground_truth) * torch.log(1 - llm_probabilities + epsilon)
+    
+    print("cross_entropy", cross_entropy, cross_entropy.shape)
     
     return (
         llm_probabilities,  # reward_logits
