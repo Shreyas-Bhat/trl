@@ -512,76 +512,76 @@ class RLOOTrainer(Trainer):
             self._save_checkpoint(model, trial=None, metrics=None)
             self.control = self.callback_handler.on_save(self.args, self.state, self.control)
 
-def generate_completions(self, sampling: bool = False):
-    args = self.args
-    processing_class = self.processing_class
-    generation_config = GenerationConfig(
-        max_new_tokens=self.args.response_length,
-        temperature=(0.01 + 1e-7),
-        top_k=0.0,
-        top_p=1.0,
-        do_sample=True,
-    )
-    table = defaultdict(list)
-    with unwrap_model_for_generation(self.model, self.accelerator) as unwrapped_model:
-        for batch in self.eval_dataloader:
-            query = batch["input_ids"]
-            with torch.no_grad():
-                context_length = query.shape[1]
-                query_response, _ = batch_generation(
-                    unwrapped_model,
-                    query,
-                    query.shape[0],
-                    processing_class.pad_token_id,
-                    generation_config,
-                )
-                response = query_response[:, context_length:]
-                ground_truth = batch["labels"].to(response.device)
-                
-                postprocessed_response = response
-                if args.stop_token_id is not None:
-                    postprocessed_response = truncate_response(
-                        args.stop_token_id, processing_class.pad_token_id, response
+    def generate_completions(self, sampling: bool = False):
+        args = self.args
+        processing_class = self.processing_class
+        generation_config = GenerationConfig(
+            max_new_tokens=self.args.response_length,
+            temperature=(0.01 + 1e-7),
+            top_k=0.0,
+            top_p=1.0,
+            do_sample=True,
+        )
+        table = defaultdict(list)
+        with unwrap_model_for_generation(self.model, self.accelerator) as unwrapped_model:
+            for batch in self.eval_dataloader:
+                query = batch["input_ids"]
+                with torch.no_grad():
+                    context_length = query.shape[1]
+                    query_response, _ = batch_generation(
+                        unwrapped_model,
+                        query,
+                        query.shape[0],
+                        processing_class.pad_token_id,
+                        generation_config,
                     )
+                    response = query_response[:, context_length:]
+                    ground_truth = batch["labels"].to(response.device)
+                    
+                    postprocessed_response = response
+                    if args.stop_token_id is not None:
+                        postprocessed_response = truncate_response(
+                            args.stop_token_id, processing_class.pad_token_id, response
+                        )
+                    
+                    # Decode before gathering
+                    decoded_queries = processing_class.batch_decode(query, skip_special_tokens=True)
+                    decoded_responses = processing_class.batch_decode(postprocessed_response)
+                    
+                    postprocessed_query_response = torch.cat((query, postprocessed_response), 1)
+                    llm_output = forward(self.llm_decision_maker, postprocessed_query_response, processing_class.pad_token_id)
+                    llm_scores = llm_output
+                    
+                    _, score, _ = get_reward(
+                        self.reward_model, 
+                        postprocessed_query_response, 
+                        processing_class.pad_token_id, 
+                        context_length, 
+                        llm_scores=llm_scores, 
+                        ground_truth=ground_truth_batch,
+                        tokenizer = AutoTokenizer.from_pretrained("facebook/opt-350m")
+                    )
+                    
+                    # Gather all tensors
+                    gathered_queries = gather_object(decoded_queries)  # Use gather_object instead
+                    gathered_responses = gather_object(decoded_responses)  # Use gather_object instead
+                    gathered_scores = self.accelerator.gather(score).float().cpu().numpy()
+                    
+                    # Extend the table with full batches
+                    table["query"].extend(gathered_queries)
+                    table["model response"].extend(gathered_responses)
+                    table["score"].extend(gathered_scores)
                 
-                # Decode before gathering
-                decoded_queries = processing_class.batch_decode(query, skip_special_tokens=True)
-                decoded_responses = processing_class.batch_decode(postprocessed_response)
-                
-                postprocessed_query_response = torch.cat((query, postprocessed_response), 1)
-                llm_output = forward(self.llm_decision_maker, postprocessed_query_response, processing_class.pad_token_id)
-                llm_scores = llm_output
-                
-                _, score, _ = get_reward(
-                    self.reward_model, 
-                    postprocessed_query_response, 
-                    processing_class.pad_token_id, 
-                    context_length, 
-                    llm_scores=llm_scores, 
-                    ground_truth=ground_truth_batch,
-                    tokenizer = AutoTokenizer.from_pretrained("facebook/opt-350m")
-                )
-                
-                # Gather all tensors
-                gathered_queries = gather_object(decoded_queries)  # Use gather_object instead
-                gathered_responses = gather_object(decoded_responses)  # Use gather_object instead
-                gathered_scores = self.accelerator.gather(score).float().cpu().numpy()
-                
-                # Extend the table with full batches
-                table["query"].extend(gathered_queries)
-                table["model response"].extend(gathered_responses)
-                table["score"].extend(gathered_scores)
-            
-            if sampling:
-                break
-    
-    df = pd.DataFrame(table)
-    if self.accelerator.is_main_process:
-        print_rich_table(df.iloc[0:5])  # Show first 5 rows
-        if "wandb" in args.report_to:
-            import wandb
-            if wandb.run is not None:
-                wandb.log({"completions": wandb.Table(dataframe=df)})
+                if sampling:
+                    break
+        
+        df = pd.DataFrame(table)
+        if self.accelerator.is_main_process:
+            print_rich_table(df.iloc[0:5])  # Show first 5 rows
+            if "wandb" in args.report_to:
+                import wandb
+                if wandb.run is not None:
+                    wandb.log({"completions": wandb.Table(dataframe=df)})
 
         # table = defaultdict(list)
         # with unwrap_model_for_generation(self.model, self.accelerator) as unwrapped_model:
