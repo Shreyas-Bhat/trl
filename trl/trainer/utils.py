@@ -1406,6 +1406,11 @@ def generate(
             - `logits` (`torch.Tensor`):
                 The logits output from the generation process.
     """
+    print("Queries shape:", queries.shape)
+    print("Queries device:", queries.device)
+    print("Unique token IDs in queries:", torch.unique(queries).tolist())
+    print("Pad token ID:", pad_token_id)
+    print("Generation config:", vars(generation_config))
     context_length = queries.shape[1]
     attention_mask = queries != pad_token_id
     input_ids = torch.masked_fill(queries, ~attention_mask, 0)
@@ -1430,6 +1435,9 @@ def batch_generation(
     pad_token_id: int,
     generation_config: GenerationConfig,
 ):
+    print("Model device:", next(model.parameters()).device)
+    print("Queries max token ID:", queries.max().item())
+    print("Queries min token ID:", queries.min().item())
     query_responses = []
     logitss = []
     batch_size = queries.shape[0]
