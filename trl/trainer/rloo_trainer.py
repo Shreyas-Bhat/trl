@@ -707,7 +707,7 @@ class RLOOTrainer(Trainer):
             for batch in self.eval_dataloader:
                 query = batch["input_ids"]
                 ground_truth = batch["labels"].to(query.device)
-                queries = queries.repeat(args.rloo_k, 1)
+                queries = query.repeat(args.rloo_k, 1)
                 ground_truth = ground_truth.repeat(args.rloo_k, 1)
                 with torch.no_grad():
                     context_length = query.shape[1]
