@@ -706,7 +706,7 @@ class RLOOTrainer(Trainer):
         with unwrap_model_for_generation(self.model, self.accelerator) as unwrapped_model:
             for batch in self.eval_dataloader:
                 query = batch["input_ids"]
-                ground_truth = batch["labels"].to(response.device)
+                ground_truth = batch["labels"].to(query.device)
                 queries = queries.repeat(args.rloo_k, 1)
                 ground_truth = ground_truth.repeat(args.rloo_k, 1)
                 with torch.no_grad():
