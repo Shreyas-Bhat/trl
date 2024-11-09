@@ -544,6 +544,153 @@ class RLOOTrainer(Trainer):
             self._save_checkpoint(model, trial=None, metrics=None)
             self.control = self.callback_handler.on_save(self.args, self.state, self.control)
 
+    # def generate_completions(self, sampling: bool = False):
+    #     args = self.args
+    #     processing_class = self.processing_class
+    #     generation_config = GenerationConfig(
+    #         max_new_tokens=self.args.response_length,
+    #         temperature=(0.01 + 1e-7),
+    #         top_k=0.0,
+    #         top_p=1.0,
+    #         do_sample=True,
+    #     )
+    #     table = defaultdict(list)
+        
+    #     with unwrap_model_for_generation(self.model, self.accelerator) as unwrapped_model:
+    #         for batch in self.eval_dataloader:
+    #             query = batch["input_ids"]
+    #             with torch.no_grad():
+    #                 context_length = query.shape[1]
+    #                 query_response, _ = batch_generation(
+    #                     unwrapped_model,
+    #                     query,
+    #                     query.shape[0],
+    #                     processing_class.pad_token_id,
+    #                     generation_config,
+    #                 )
+    #                 response = query_response[:, context_length:]
+    #                 # print("query_response, response", query_response.shape, response.shape)
+    #                 ground_truth = batch["labels"].to(response.device)
+                    
+    #                 postprocessed_response = response
+    #                 if args.stop_token_id is not None:
+    #                     postprocessed_response = truncate_response(
+    #                         args.stop_token_id, processing_class.pad_token_id, response
+    #                     )
+                    
+    #                 # Decode queries and responses
+    #                 decoded_queries = processing_class.batch_decode(query, skip_special_tokens=True)
+    #                 decoded_responses = processing_class.batch_decode(postprocessed_response)
+                    
+    #                 # Get LLM scores
+    #                 # print("query, postprocessed_response", query.shape, postprocessed_response.shape)
+    #                 postprocessed_query_response = torch.cat((query, postprocessed_response), 1)
+    #                 decoded_sequences = processing_class.batch_decode(postprocessed_query_response, skip_special_tokens=True)
+    #                 # print("\nFull Query-Response Pairs after processing:")
+    #                 # for idx, sequence in enumerate(decoded_sequences):
+    #                 #     print(f"\nPair {idx + 1}:")
+    #                 #     print(f"Full sequence: {sequence}")
+    #                 #     query_text = processing_class.batch_decode(query[idx:idx+1], skip_special_tokens=True)[0]
+    #                 #     response_text = sequence[len(query_text):]
+    #                 #     print(f"Query part: {query_text}")
+    #                 #     print(f"Response part: {response_text}")
+    #                 # print("postprocessed_query_response", postprocessed_query_response.shape)
+    #                 llm_output = forward(self.llm_decision_maker, postprocessed_query_response, processing_class.pad_token_id)
+    #                 llm_scores = llm_output
+    #                 # print("llm_scores", llm_scores)
+                    
+    #                 # Get reward scores
+    #                 _, score, _ = get_reward(
+    #                     self.reward_model, 
+    #                     postprocessed_query_response, 
+    #                     processing_class.pad_token_id, 
+    #                     context_length, 
+    #                     llm_scores=llm_scores, 
+    #                     ground_truth=ground_truth,
+    #                     tokenizer=AutoTokenizer.from_pretrained("Qwen/Qwen2-0.5B")
+    #                 )
+                    
+    #                 # Ensure score is properly shaped and gathered
+    #                 score = score.view(-1)  # Reshape to 1D
+    #                 gathered_scores = self.accelerator.gather(score)
+    #                 gathered_scores = gathered_scores.float().cpu().numpy().tolist()  # Convert to list
+                    
+    #                 # Gather queries and responses
+    #                 gathered_queries = gather_object(decoded_queries)
+    #                 gathered_responses = gather_object(decoded_responses)
+                    
+    #                 # Make sure all gathered data has the same length
+    #                 # min_length = min(len(gathered_queries), len(gathered_responses), len(gathered_scores))
+                    
+    #                 # Extend the table with consistent lengths
+    #                 # print("gathered_queries,gathered_responses", gathered_queries, gathered_responses)
+    #                 table["query"].extend(gathered_queries)
+    #                 table["model response"].extend(gathered_responses)
+    #                 table["score"].extend(gathered_scores)
+                    
+    #                 # Print shapes for debugging
+    #                 print(f"Gathered lengths - queries: {len(gathered_queries)}, responses: {len(gathered_responses)}, scores: {len(gathered_scores)}")
+                
+    #             if sampling:
+    #                 break
+        
+    #     df = pd.DataFrame(table)
+    #     if self.accelerator.is_main_process:
+    #         print_rich_table(df.iloc[0:5])
+    #         if "wandb" in args.report_to:
+    #             import wandb
+    #             if wandb.run is not None:
+    #                 wandb.log({"completions": wandb.Table(dataframe=df)})
+
+    #     # table = defaultdict(list)
+    #     # with unwrap_model_for_generation(self.model, self.accelerator) as unwrapped_model:
+    #     #     for batch in self.eval_dataloader:
+    #     #         query = batch["input_ids"]
+    #     #         with torch.no_grad():
+    #     #             context_length = query.shape[1]
+    #     #             query_response, _ = batch_generation(
+    #     #                 unwrapped_model,
+    #     #                 query,
+    #     #                 query.shape[0],
+    #     #                 processing_class.pad_token_id,
+    #     #                 generation_config,
+    #     #             )
+    #     #             response = query_response[:, context_length:]
+    #     #             ground_truth = batch["labels"].to(response.device)
+    #     #             print("ground_truth", ground_truth)
+    #     #             ground_truth_batch = ground_truth
+    #     #             postprocessed_response = response
+    #     #             if args.stop_token_id is not None:  # handle the edge case when stop_token_id exists but is 0
+    #     #                 postprocessed_response = truncate_response(
+    #     #                     args.stop_token_id, processing_class.pad_token_id, response
+    #     #                 )
+    #     #             table["query"].extend(
+    #     #                 gather_object(processing_class.batch_decode(query, skip_special_tokens=True))
+    #     #             )
+    #     #             table["model response"].extend(
+    #     #                 gather_object(processing_class.batch_decode(postprocessed_response))
+    #     #             )
+
+    #     #             postprocessed_query_response = torch.cat((query, postprocessed_response), 1)
+    #     #             llm_output = forward(self.llm_decision_maker, postprocessed_query_response, processing_class.pad_token_id)
+    #     #             llm_scores = llm_output
+    #     #             _, score, _ = get_reward(
+    #     #                 self.reward_model, postprocessed_query_response, processing_class.pad_token_id, context_length, llm_scores=llm_scores, ground_truth=ground_truth_batch
+    #     #             )
+    #     #             print("Score:", score)
+    #     #             table["score"].extend(self.accelerator.gather(score.unsqueeze(0)).float().cpu().numpy()) #TODO: fix the unsqueezing
+
+    #     #         if sampling:
+    #     #             break
+    #     # df = pd.DataFrame(table)
+
+    #     # if self.accelerator.is_main_process:
+    #     #     print_rich_table(df.iloc[0 : 0 + 5])
+    #     #     if "wandb" in args.report_to:
+    #     #         import wandb
+
+    #     #         if wandb.run is not None:
+    #     #             wandb.log({"completions": wandb.Table(dataframe=df)})
     def generate_completions(self, sampling: bool = False):
         args = self.args
         processing_class = self.processing_class
@@ -554,8 +701,8 @@ class RLOOTrainer(Trainer):
             top_p=1.0,
             do_sample=True,
         )
+
         table = defaultdict(list)
-        
         with unwrap_model_for_generation(self.model, self.accelerator) as unwrapped_model:
             for batch in self.eval_dataloader:
                 query = batch["input_ids"]
@@ -569,37 +716,21 @@ class RLOOTrainer(Trainer):
                         generation_config,
                     )
                     response = query_response[:, context_length:]
-                    # print("query_response, response", query_response.shape, response.shape)
-                    ground_truth = batch["labels"].to(response.device)
-                    
                     postprocessed_response = response
-                    if args.stop_token_id is not None:
+                    if args.stop_token_id is not None:  # handle the edge case when stop_token_id exists but is 0
                         postprocessed_response = truncate_response(
                             args.stop_token_id, processing_class.pad_token_id, response
                         )
-                    
-                    # Decode queries and responses
-                    decoded_queries = processing_class.batch_decode(query, skip_special_tokens=True)
-                    decoded_responses = processing_class.batch_decode(postprocessed_response)
-                    
-                    # Get LLM scores
-                    # print("query, postprocessed_response", query.shape, postprocessed_response.shape)
+                    table["query"].extend(
+                        gather_object(processing_class.batch_decode(query, skip_special_tokens=True))
+                    )
+                    table["model response"].extend(
+                        gather_object(processing_class.batch_decode(postprocessed_response))
+                    )
+
                     postprocessed_query_response = torch.cat((query, postprocessed_response), 1)
-                    decoded_sequences = processing_class.batch_decode(postprocessed_query_response, skip_special_tokens=True)
-                    # print("\nFull Query-Response Pairs after processing:")
-                    # for idx, sequence in enumerate(decoded_sequences):
-                    #     print(f"\nPair {idx + 1}:")
-                    #     print(f"Full sequence: {sequence}")
-                    #     query_text = processing_class.batch_decode(query[idx:idx+1], skip_special_tokens=True)[0]
-                    #     response_text = sequence[len(query_text):]
-                    #     print(f"Query part: {query_text}")
-                    #     print(f"Response part: {response_text}")
-                    # print("postprocessed_query_response", postprocessed_query_response.shape)
                     llm_output = forward(self.llm_decision_maker, postprocessed_query_response, processing_class.pad_token_id)
                     llm_scores = llm_output
-                    # print("llm_scores", llm_scores)
-                    
-                    # Get reward scores
                     _, score, _ = get_reward(
                         self.reward_model, 
                         postprocessed_query_response, 
@@ -615,83 +746,22 @@ class RLOOTrainer(Trainer):
                     gathered_scores = self.accelerator.gather(score)
                     gathered_scores = gathered_scores.float().cpu().numpy().tolist()  # Convert to list
                     
-                    # Gather queries and responses
-                    gathered_queries = gather_object(decoded_queries)
-                    gathered_responses = gather_object(decoded_responses)
-                    
-                    # Make sure all gathered data has the same length
-                    # min_length = min(len(gathered_queries), len(gathered_responses), len(gathered_scores))
-                    
-                    # Extend the table with consistent lengths
-                    # print("gathered_queries,gathered_responses", gathered_queries, gathered_responses)
-                    table["query"].extend(gathered_queries)
-                    table["model response"].extend(gathered_responses)
-                    table["score"].extend(gathered_scores)
-                    
-                    # Print shapes for debugging
-                    print(f"Gathered lengths - queries: {len(gathered_queries)}, responses: {len(gathered_responses)}, scores: {len(gathered_scores)}")
-                
+                    # _, score, _ = get_reward(
+                    #     self.reward_model, postprocessed_query_response, processing_class.pad_token_id, context_length
+                    # )
+                    table["score"].extend(self.accelerator.gather(score).float().cpu().numpy())
+
                 if sampling:
                     break
-        
         df = pd.DataFrame(table)
+
         if self.accelerator.is_main_process:
-            print_rich_table(df.iloc[0:5])
+            print_rich_table(df.iloc[0 : 0 + 5])
             if "wandb" in args.report_to:
                 import wandb
+
                 if wandb.run is not None:
                     wandb.log({"completions": wandb.Table(dataframe=df)})
-
-        # table = defaultdict(list)
-        # with unwrap_model_for_generation(self.model, self.accelerator) as unwrapped_model:
-        #     for batch in self.eval_dataloader:
-        #         query = batch["input_ids"]
-        #         with torch.no_grad():
-        #             context_length = query.shape[1]
-        #             query_response, _ = batch_generation(
-        #                 unwrapped_model,
-        #                 query,
-        #                 query.shape[0],
-        #                 processing_class.pad_token_id,
-        #                 generation_config,
-        #             )
-        #             response = query_response[:, context_length:]
-        #             ground_truth = batch["labels"].to(response.device)
-        #             print("ground_truth", ground_truth)
-        #             ground_truth_batch = ground_truth
-        #             postprocessed_response = response
-        #             if args.stop_token_id is not None:  # handle the edge case when stop_token_id exists but is 0
-        #                 postprocessed_response = truncate_response(
-        #                     args.stop_token_id, processing_class.pad_token_id, response
-        #                 )
-        #             table["query"].extend(
-        #                 gather_object(processing_class.batch_decode(query, skip_special_tokens=True))
-        #             )
-        #             table["model response"].extend(
-        #                 gather_object(processing_class.batch_decode(postprocessed_response))
-        #             )
-
-        #             postprocessed_query_response = torch.cat((query, postprocessed_response), 1)
-        #             llm_output = forward(self.llm_decision_maker, postprocessed_query_response, processing_class.pad_token_id)
-        #             llm_scores = llm_output
-        #             _, score, _ = get_reward(
-        #                 self.reward_model, postprocessed_query_response, processing_class.pad_token_id, context_length, llm_scores=llm_scores, ground_truth=ground_truth_batch
-        #             )
-        #             print("Score:", score)
-        #             table["score"].extend(self.accelerator.gather(score.unsqueeze(0)).float().cpu().numpy()) #TODO: fix the unsqueezing
-
-        #         if sampling:
-        #             break
-        # df = pd.DataFrame(table)
-
-        # if self.accelerator.is_main_process:
-        #     print_rich_table(df.iloc[0 : 0 + 5])
-        #     if "wandb" in args.report_to:
-        #         import wandb
-
-        #         if wandb.run is not None:
-        #             wandb.log({"completions": wandb.Table(dataframe=df)})
-
     def create_model_card(
         self,
         model_name: Optional[str] = None,
