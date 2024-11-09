@@ -706,12 +706,15 @@ class RLOOTrainer(Trainer):
         with unwrap_model_for_generation(self.model, self.accelerator) as unwrapped_model:
             for batch in self.eval_dataloader:
                 query = batch["input_ids"]
+                ground_truth = batch["labels"].to(response.device)
+                queries = queries.repeat(args.rloo_k, 1)
+                ground_truth = ground_truth.repeat(args.rloo_k, 1)
                 with torch.no_grad():
                     context_length = query.shape[1]
                     query_response, _ = batch_generation(
                         unwrapped_model,
-                        query,
-                        query.shape[0],
+                        queries,
+                        query.shape[0], #8
                         processing_class.pad_token_id,
                         generation_config,
                     )
@@ -731,7 +734,7 @@ class RLOOTrainer(Trainer):
                     postprocessed_query_response = torch.cat((query, postprocessed_response), 1)
                     llm_output = forward(self.llm_decision_maker, postprocessed_query_response, processing_class.pad_token_id)
                     llm_scores = llm_output
-                    ground_truth = batch["labels"].to(response.device)
+                    
                     _, score, _ = get_reward(
                         self.reward_model, 
                         postprocessed_query_response, 
