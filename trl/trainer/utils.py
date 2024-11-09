@@ -1413,6 +1413,9 @@ def generate(
     print("Generation config:", vars(generation_config))
     context_length = queries.shape[1]
     attention_mask = queries != pad_token_id
+    print("Number of padding tokens:", (queries == pad_token_id).sum().item())
+    print("Number of non-padding tokens:", (queries != pad_token_id).sum().item())
+    print("Generation config pad_token_id:", generation_config.pad_token_id)
     input_ids = torch.masked_fill(queries, ~attention_mask, 0)
     output = lm_backbone.generate(
         input_ids=input_ids,
