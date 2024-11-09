@@ -360,7 +360,7 @@ class RLOOTrainer(Trainer):
 
                     # Response Processing 2. run reward model on the truncated responses
                     postprocessed_query_response = torch.cat((query, postprocessed_response), 1)
-                    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2-0.5B")
+                    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-0.5B-Instruct")
                     # Decode and print the components separately
                     print("\n=== Query-Response Components ===")
                     print("1. Original Query:")
@@ -387,7 +387,7 @@ class RLOOTrainer(Trainer):
                     llm_scores = llm_output
                     # print(f"The following are the llm_scores: {llm_scores}")
                     _, score, _ = get_reward(
-                        reward_model, postprocessed_query_response, processing_class.pad_token_id, context_length, llm_scores=llm_scores, ground_truth=ground_truth_batch, tokenizer=AutoTokenizer.from_pretrained("Qwen/Qwen2-0.5B")
+                        reward_model, postprocessed_query_response, processing_class.pad_token_id, context_length, llm_scores=llm_scores, ground_truth=ground_truth_batch, tokenizer=AutoTokenizer.from_pretrained("Qwen/Qwen2.5-0.5B-Instruct")
                     ) #TODO: changing this line 
                     # _, score, _ = get_reward(
                     #     reward_model, postprocessed_response, processing_class.pad_token_id, context_length, llm_scores=llm_scores, ground_truth=ground_truth_batch, tokenizer=AutoTokenizer.from_pretrained("Qwen/Qwen2-0.5B")
@@ -739,7 +739,7 @@ class RLOOTrainer(Trainer):
                         context_length, 
                         llm_scores=llm_scores, 
                         ground_truth=ground_truth,
-                        tokenizer=AutoTokenizer.from_pretrained("Qwen/Qwen2-0.5B")
+                        tokenizer=AutoTokenizer.from_pretrained("Qwen/Qwen2.5-0.5B-Instruct")
                     )
                     
                     # Ensure score is properly shaped and gathered
