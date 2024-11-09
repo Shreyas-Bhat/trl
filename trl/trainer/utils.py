@@ -1419,6 +1419,7 @@ def generate(
     input_ids = torch.masked_fill(queries, ~attention_mask, 0)
     print("Checking shapes:", input_ids.shape, attention_mask.shape)
     print("Checking type:", input_ids.dtype, attention_mask.dtype)
+    print("Checking device:", input_ids.device, attention_mask.device)
     output = lm_backbone.generate(
         input_ids=input_ids,
         attention_mask=attention_mask,

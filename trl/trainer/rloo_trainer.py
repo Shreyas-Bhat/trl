@@ -317,7 +317,7 @@ class RLOOTrainer(Trainer):
                     query_responses, logitss = batch_generation(
                         unwrapped_model,
                         queries,
-                        args.local_rollout_forward_batch_size,
+                        args.local_rollout_forward_batch_size, #64
                         processing_class.pad_token_id,
                         generation_config,
                     )
