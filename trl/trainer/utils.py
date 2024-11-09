@@ -1027,7 +1027,7 @@ class OnPolicyConfig(TrainingArguments):
     total_episodes: Optional[int] = None
     local_rollout_forward_batch_size: int = 64
     num_sample_generations: int = 10
-    response_length: int = 53
+    response_length: int = 512
     stop_token: Optional[Literal["eos"]] = None
     stop_token_id: Optional[int] = None
     temperature: float = 0.7
