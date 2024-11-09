@@ -1224,7 +1224,7 @@ def get_reward(
         # Generate complete responses
         generated_outputs = model.generate(
             **inputs,
-            max_new_tokens=5,  # Adjust based on expected response length
+            max_new_tokens=100,  # Adjust based on expected response length
             num_beams=1,       # Use greedy decoding
             do_sample=False,   # Don't use sampling
             pad_token_id=tokenizer.pad_token_id,
