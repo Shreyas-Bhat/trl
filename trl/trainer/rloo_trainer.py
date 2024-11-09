@@ -535,8 +535,8 @@ class RLOOTrainer(Trainer):
             torch.cuda.empty_cache()
             gc.collect()
 
-            # if args.num_sample_generations > 0 and (update - 1) % self.sample_generations_freq == 0:
-            #     self.generate_completions(sampling=True) #TODO: print this back
+            if args.num_sample_generations > 0 and (update - 1) % self.sample_generations_freq == 0:
+                self.generate_completions(sampling=True) #TODO: print this back
 
         # HF trainer specifics
         self.control = self.callback_handler.on_train_end(args, self.state, self.control)
