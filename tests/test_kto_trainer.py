@@ -20,7 +20,7 @@ from parameterized import parameterized
 from transformers import AutoModelForCausalLM, AutoModelForSeq2SeqLM, AutoTokenizer
 from transformers.testing_utils import require_peft
 
-from trl import KTOConfig, KTOTrainer
+from trl_run import KTOConfig, KTOTrainer
 from trl.trainer.kto_trainer import _get_kl_dataset, _process_tokens, _tokenize
 
 from .testing_utils import require_no_wandb

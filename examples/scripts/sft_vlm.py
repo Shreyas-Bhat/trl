@@ -38,7 +38,7 @@ import torch
 from datasets import load_dataset
 from transformers import AutoModelForVision2Seq, AutoProcessor, LlavaForConditionalGeneration
 
-from trl import (
+from trl_run import (
     ModelConfig,
     ScriptArguments,
     SFTConfig,

@@ -57,7 +57,7 @@ python examples/scripts/orpo.py \
 from datasets import load_dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer, HfArgumentParser
 
-from trl import ModelConfig, ORPOConfig, ORPOTrainer, ScriptArguments, get_peft_config
+from trl_run import ModelConfig, ORPOConfig, ORPOTrainer, ScriptArguments, get_peft_config
 from trl.trainer.utils import SIMPLE_CHAT_TEMPLATE
 
 

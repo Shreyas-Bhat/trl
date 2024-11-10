@@ -62,7 +62,7 @@ from ..trainer.utils import (
 from .rloo_config import RLOOConfig
 from .utils import generate_model_card
 
-
+device = "cuda" if torch.cuda.is_available() else "cpu"
 if is_wandb_available():
     import wandb
 
@@ -224,7 +224,8 @@ class RLOOTrainer(Trainer):
             self.ref_policy = prepare_deepspeed(
                 self.ref_policy, args.per_device_train_batch_size, args.fp16, args.bf16
             )
-            self.llm_decision_maker = self.llm_decision_maker.to(self.accelerator.device)
+            # self.llm_decision_maker = self.llm_decision_maker.to(self.accelerator.device)
+            self.llm_decision_maker = self.llm_decision_maker.to(device)
             self.deepspeed = self.model
         else:
             self.ref_policy = self.ref_policy.to(self.accelerator.device)
@@ -360,10 +361,11 @@ class RLOOTrainer(Trainer):
 
                     # Response Processing 2. run reward model on the truncated responses
                     postprocessed_query_response = torch.cat((query, postprocessed_response), 1)
-                    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-0.5B-Instruct")
+                    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2-0.5B")
                     # Decode and print the components separately
                     print("\n=== Query-Response Components ===")
                     print("1. Original Query:")
+                    print("postprocessed_query_response", postprocessed_query_response)
                     query_text = tokenizer.batch_decode(query, skip_special_tokens=True)
                     for i, q in enumerate(query_text):
                         print(f"Query {i+1}: {q}")
@@ -387,7 +389,7 @@ class RLOOTrainer(Trainer):
                     llm_scores = llm_output
                     # print(f"The following are the llm_scores: {llm_scores}")
                     _, score, _ = get_reward(
-                        reward_model, postprocessed_query_response, processing_class.pad_token_id, context_length, llm_scores=llm_scores, ground_truth=ground_truth_batch, tokenizer=AutoTokenizer.from_pretrained("Qwen/Qwen2.5-0.5B-Instruct")
+                        reward_model, postprocessed_query_response, processing_class.pad_token_id, context_length, llm_scores=llm_scores, ground_truth=ground_truth_batch, tokenizer=AutoTokenizer.from_pretrained("Qwen/Qwen2-0.5B")
                     ) #TODO: changing this line 
                     # _, score, _ = get_reward(
                     #     reward_model, postprocessed_response, processing_class.pad_token_id, context_length, llm_scores=llm_scores, ground_truth=ground_truth_batch, tokenizer=AutoTokenizer.from_pretrained("Qwen/Qwen2-0.5B")
@@ -691,81 +693,217 @@ class RLOOTrainer(Trainer):
 
     #     #         if wandb.run is not None:
     #     #             wandb.log({"completions": wandb.Table(dataframe=df)})
+    # def generate_completions(self, sampling: bool = False):
+    #     args = self.args
+    #     processing_class = self.processing_class
+    #     # generation_config = GenerationConfig(
+    #     #     max_new_tokens=self.args.response_length,
+    #     #     temperature=(0.01 + 1e-7),
+    #     #     top_k=0.0,
+    #     #     top_p=1.0,
+    #     #     do_sample=True,
+    #     # )
+    #     generation_config = GenerationConfig(
+    #     max_new_tokens=20,  # Adjust as needed
+    #     do_sample=True,
+    #     temperature=1.0,
+    #     top_k=50,
+    #     top_p=0.95,
+    #     pad_token_id=processing_class.pad_token_id,
+    #     renormalize_logits=True
+    # )
+
+    #     table = defaultdict(list)
+    #     with unwrap_model_for_generation(self.model, self.accelerator) as unwrapped_model:
+    #         for batch in self.eval_dataloader:
+    #             query = batch["input_ids"]
+    #             ground_truth = batch["labels"].to(query.device)
+    #             # queries = query.repeat(args.rloo_k, 1)
+    #             # ground_truth = ground_truth.repeat(args.rloo_k, 1)
+    #             with torch.no_grad():
+    #                 context_length = query.shape[1]
+    #                 query_response, _ = batch_generation(
+    #                     unwrapped_model,
+    #                     query,
+    #                     query.shape[0], #8
+    #                     processing_class.pad_token_id,
+    #                     generation_config,
+    #                 )
+    #                 response = query_response[:, context_length:]
+    #                 postprocessed_response = response
+    #                 if args.stop_token_id is not None:  # handle the edge case when stop_token_id exists but is 0
+    #                     postprocessed_response = truncate_response(
+    #                         args.stop_token_id, processing_class.pad_token_id, response
+    #                     )
+    #                 table["query"].extend(
+    #                     gather_object(processing_class.batch_decode(query, skip_special_tokens=True))
+    #                 )
+    #                 table["model response"].extend(
+    #                     gather_object(processing_class.batch_decode(postprocessed_response))
+    #                 )
+
+    #                 postprocessed_query_response = torch.cat((query, postprocessed_response), 1)
+    #                 llm_output = forward(self.llm_decision_maker, postprocessed_query_response, processing_class.pad_token_id)
+    #                 llm_scores = llm_output
+                    
+    #                 _, score, _ = get_reward(
+    #                     self.reward_model, 
+    #                     postprocessed_query_response, 
+    #                     processing_class.pad_token_id, 
+    #                     context_length, 
+    #                     llm_scores=llm_scores, 
+    #                     ground_truth=ground_truth,
+    #                     tokenizer=AutoTokenizer.from_pretrained("Qwen/Qwen2.5-0.5B-Instruct")
+    #                 )
+                    
+    #                 # Ensure score is properly shaped and gathered
+    #                 score = score.view(-1)  # Reshape to 1D
+    #                 gathered_scores = self.accelerator.gather(score)
+    #                 gathered_scores = gathered_scores.float().cpu().numpy().tolist()  # Convert to list
+                    
+    #                 # _, score, _ = get_reward(
+    #                 #     self.reward_model, postprocessed_query_response, processing_class.pad_token_id, context_length
+    #                 # )
+    #                 table["score"].extend(self.accelerator.gather(score).float().cpu().numpy())
+
+    #             if sampling:
+    #                 break
+    #     df = pd.DataFrame(table)
+
+    #     if self.accelerator.is_main_process:
+    #         print_rich_table(df.iloc[0 : 0 + 5])
+    #         if "wandb" in args.report_to:
+    #             import wandb
+
+    #             if wandb.run is not None:
+    #                 wandb.log({"completions": wandb.Table(dataframe=df)})
     def generate_completions(self, sampling: bool = False):
         args = self.args
         processing_class = self.processing_class
+        
         generation_config = GenerationConfig(
-            max_new_tokens=self.args.response_length,
-            temperature=(0.01 + 1e-7),
-            top_k=0.0,
-            top_p=1.0,
+            max_new_tokens=20,
             do_sample=True,
+            num_beams=1,
+            temperature=1.2,
+            top_k=50,
+            top_p=0.95,
+            pad_token_id=processing_class.pad_token_id,
+            renormalize_logits=True,
+            no_repeat_ngram_size=3,
+            repetition_penalty=1.2,
         )
-
-        table = defaultdict(list)
+        
+        # Store data in parallel lists
+        queries = []
+        responses = []
+        scores = []
+        
         with unwrap_model_for_generation(self.model, self.accelerator) as unwrapped_model:
-            for batch in self.eval_dataloader:
+            unwrapped_model.eval()
+            
+            for batch_idx, batch in enumerate(self.eval_dataloader):
                 query = batch["input_ids"]
                 ground_truth = batch["labels"].to(query.device)
-                queries = query.repeat(args.rloo_k, 1)
-                ground_truth = ground_truth.repeat(args.rloo_k, 1)
+                
+                # queries_batch = query.repeat(args.rloo_k, 1)
+                # ground_truth = ground_truth.repeat(args.rloo_k, 1)
+                
                 with torch.no_grad():
                     context_length = query.shape[1]
+                    
                     query_response, _ = batch_generation(
                         unwrapped_model,
-                        queries,
-                        query.shape[0], #8
+                        query,
+                        query.shape[0],
                         processing_class.pad_token_id,
                         generation_config,
                     )
+                    
                     response = query_response[:, context_length:]
                     postprocessed_response = response
-                    if args.stop_token_id is not None:  # handle the edge case when stop_token_id exists but is 0
+                    
+                    if args.stop_token_id is not None:
                         postprocessed_response = truncate_response(
-                            args.stop_token_id, processing_class.pad_token_id, response
+                            args.stop_token_id, 
+                            processing_class.pad_token_id, 
+                            response
                         )
-                    table["query"].extend(
-                        gather_object(processing_class.batch_decode(query, skip_special_tokens=True))
-                    )
-                    table["model response"].extend(
-                        gather_object(processing_class.batch_decode(postprocessed_response))
-                    )
-
+                    
+                    # Decode and process
+                    batch_queries = processing_class.batch_decode(query, skip_special_tokens=True)
+                    batch_responses = processing_class.batch_decode(postprocessed_response)
+                    
                     postprocessed_query_response = torch.cat((query, postprocessed_response), 1)
-                    llm_output = forward(self.llm_decision_maker, postprocessed_query_response, processing_class.pad_token_id)
+                    
+                    llm_output = forward(
+                        self.llm_decision_maker, 
+                        postprocessed_query_response, 
+                        processing_class.pad_token_id
+                    )
                     llm_scores = llm_output
                     
                     _, score, _ = get_reward(
-                        self.reward_model, 
-                        postprocessed_query_response, 
-                        processing_class.pad_token_id, 
-                        context_length, 
-                        llm_scores=llm_scores, 
+                        self.reward_model,
+                        postprocessed_query_response,
+                        processing_class.pad_token_id,
+                        context_length,
+                        llm_scores=llm_scores,
                         ground_truth=ground_truth,
-                        tokenizer=AutoTokenizer.from_pretrained("Qwen/Qwen2.5-0.5B-Instruct")
+                        tokenizer=AutoTokenizer.from_pretrained("Qwen/Qwen2-0.5B")
                     )
                     
-                    # Ensure score is properly shaped and gathered
-                    score = score.view(-1)  # Reshape to 1D
-                    gathered_scores = self.accelerator.gather(score)
-                    gathered_scores = gathered_scores.float().cpu().numpy().tolist()  # Convert to list
+                    score_np = score.view(-1).float().cpu().numpy()
                     
-                    # _, score, _ = get_reward(
-                    #     self.reward_model, postprocessed_query_response, processing_class.pad_token_id, context_length
-                    # )
-                    table["score"].extend(self.accelerator.gather(score).float().cpu().numpy())
-
+                    # Store data
+                    for q, r, s in zip(batch_queries, batch_responses, score_np):
+                        queries.append(str(q) if q is not None else "")
+                        responses.append(str(r) if r is not None else "")
+                        scores.append(float(s) if s is not None else 0.0)
+                
                 if sampling:
                     break
-        df = pd.DataFrame(table)
+            
+            # Create structured NumPy array
+            # import numpy as np
+            
+            # # Option 1: Using structured array
+            # dtype = [
+            #     ('query', 'O'),  # Object type for strings
+            #     ('model_response', 'O'),  # Object type for strings
+            #     ('score', 'f8')  # float64 for scores
+            # ]
+            import pandas as pd 
+            data_dict = {
+                'query': list(queries),
+                'model response': list(responses),
+                'score': list(scores)
+            }
+            data = pd.DataFrame(data_dict)
+            # Print inspection of numpy array
+            # print("\nNumPy array created:")
+            # print(f"Shape: {data.shape}")
+            # print(f"dtype: {data.dtype}")
+            # print("\nFirst few rows:")
+            # print(data[:3])
+            
+            # Report results
+            # if self.accelerator.is_main_process:
+            #     print("\nSample outputs:")
+            #     for i in range(min(5, len(data))):
+            #         print(f"\nRow {i+1}:")
+            #         print(f"Query: {data[i]['query'][:100]}")
+            #         print(f"Response: {data[i]['model_response'][:100]}")
+            #         print(f"Score: {data[i]['score']}")
+                
+            if "wandb" in args.report_to and wandb.run is not None:
+                # Convert to DataFrame only for wandb logging if needed
+                import pandas as pd
+                temp_df = pd.DataFrame(data)
+                wandb.log({"completions": wandb.Table(dataframe=temp_df)})
+        
+            return data
 
-        if self.accelerator.is_main_process:
-            print_rich_table(df.iloc[0 : 0 + 5])
-            if "wandb" in args.report_to:
-                import wandb
-
-                if wandb.run is not None:
-                    wandb.log({"completions": wandb.Table(dataframe=df)})
     def create_model_card(
         self,
         model_name: Optional[str] = None,

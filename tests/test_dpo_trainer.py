@@ -36,7 +36,7 @@ from transformers.testing_utils import (
     require_vision,
 )
 
-from trl import DPOConfig, DPOTrainer, FDivergenceType
+from trl_run import DPOConfig, DPOTrainer, FDivergenceType
 
 from .testing_utils import require_no_wandb
 

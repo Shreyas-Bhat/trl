@@ -20,7 +20,7 @@ import torch
 from datasets import Dataset
 from transformers import AutoModelForCausalLM, AutoModelForSequenceClassification, AutoTokenizer
 
-from trl import RLOOConfig, RLOOTrainer
+from trl_run import RLOOConfig, RLOOTrainer
 
 
 def test():

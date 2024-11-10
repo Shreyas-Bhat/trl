@@ -30,7 +30,7 @@ import torch
 from datasets import load_dataset
 from transformers import AutoModelForVision2Seq, AutoProcessor
 
-from trl import (
+from trl_run import (
     DPOConfig,
     DPOTrainer,
     ModelConfig,

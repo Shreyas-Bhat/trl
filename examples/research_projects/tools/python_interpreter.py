@@ -23,7 +23,7 @@ from datasets import load_dataset
 from peft import LoraConfig
 from transformers import AutoTokenizer, HfArgumentParser, load_tool
 
-from trl import AutoModelForCausalLMWithValueHead, PPOConfig, PPOTrainer, TextEnvironment
+from trl_run import AutoModelForCausalLMWithValueHead, PPOConfig, PPOTrainer, TextEnvironment
 
 
 os.environ["HF_ALLOW_CODE_EVAL"] = "1"

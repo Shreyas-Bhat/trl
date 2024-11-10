@@ -33,7 +33,7 @@ import torch
 from datasets import load_dataset
 from transformers import AutoModelForCausalLM, AutoModelForSequenceClassification, AutoTokenizer, GenerationConfig
 
-from trl import (
+from trl_run import (
     HfPairwiseJudge,
     LogCompletionsCallback,
     ModelConfig,

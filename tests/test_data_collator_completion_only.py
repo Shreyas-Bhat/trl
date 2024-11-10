@@ -16,7 +16,7 @@ import unittest
 import torch
 from transformers import AutoTokenizer
 
-from trl import DataCollatorForCompletionOnlyLM
+from trl_run import DataCollatorForCompletionOnlyLM
 
 
 class DataCollatorForCompletionOnlyLMTester(unittest.TestCase):

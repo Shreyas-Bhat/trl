@@ -18,7 +18,7 @@ from unittest.mock import patch
 import torch
 from transformers import AutoTokenizer
 
-from trl import AutoModelForCausalLMWithValueHead, TextEnvironment, TextHistory
+from trl_run import AutoModelForCausalLMWithValueHead, TextEnvironment, TextHistory
 
 
 class DummyTool:

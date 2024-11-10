@@ -20,7 +20,7 @@ import torch.nn.functional as F
 from datasets import load_dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer, GenerationConfig
 
-from trl import GKDConfig, GKDTrainer
+from trl_run import GKDConfig, GKDTrainer
 from trl.trainer.utils import SIMPLE_CHAT_TEMPLATE
 
 

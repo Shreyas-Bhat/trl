@@ -20,7 +20,7 @@ from transformers import AutoModelForCausalLM, AutoModelForSequenceClassificatio
 from transformers.testing_utils import require_peft
 from transformers.utils import is_peft_available
 
-from trl import NashMDConfig, NashMDTrainer, PairRMJudge
+from trl_run import NashMDConfig, NashMDTrainer, PairRMJudge
 
 from .testing_utils import require_llm_blender
 

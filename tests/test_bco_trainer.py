@@ -22,7 +22,7 @@ from parameterized import parameterized
 from transformers import AutoModel, AutoModelForCausalLM, AutoModelForSeq2SeqLM, AutoTokenizer
 from transformers.testing_utils import require_peft
 
-from trl import BCOConfig, BCOTrainer
+from trl_run import BCOConfig, BCOTrainer
 from trl.trainer.bco_trainer import _process_tokens, _tokenize
 
 from .testing_utils import require_no_wandb, require_sklearn

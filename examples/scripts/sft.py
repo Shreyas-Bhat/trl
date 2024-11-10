@@ -51,7 +51,7 @@ python examples/scripts/sft.py \
 from datasets import load_dataset
 from transformers import AutoTokenizer
 
-from trl import (
+from trl_run import (
     ModelConfig,
     ScriptArguments,
     SFTConfig,

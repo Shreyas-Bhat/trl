@@ -23,7 +23,7 @@ from transformers.testing_utils import (
 )
 from transformers.utils import is_peft_available
 
-from trl import AutoModelForCausalLMWithValueHead
+from trl_run import AutoModelForCausalLMWithValueHead
 
 
 if is_peft_available():

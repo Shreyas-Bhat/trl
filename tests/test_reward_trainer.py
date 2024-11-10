@@ -20,7 +20,7 @@ from transformers import AutoModelForSequenceClassification, AutoTokenizer, Eval
 from transformers.testing_utils import require_peft
 from transformers.utils import is_peft_available
 
-from trl import RewardConfig, RewardTrainer, maybe_apply_chat_template
+from trl_run import RewardConfig, RewardTrainer, maybe_apply_chat_template
 from trl.trainer import compute_accuracy
 from trl.trainer.reward_trainer import _tokenize
 

@@ -19,7 +19,7 @@ from datasets import load_dataset
 from parameterized import parameterized
 from transformers import AutoModelForCausalLM, AutoModelForSequenceClassification, AutoTokenizer
 
-from trl import (
+from trl_run import (
     BCOConfig,
     BCOTrainer,
     CPOConfig,

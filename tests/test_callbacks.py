@@ -22,7 +22,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, GenerationConfig, 
 from transformers.testing_utils import require_peft, require_wandb
 from transformers.utils import is_peft_available
 
-from trl import BasePairwiseJudge, LogCompletionsCallback, WinRateCallback
+from trl_run import BasePairwiseJudge, LogCompletionsCallback, WinRateCallback
 
 
 if is_peft_available():

@@ -58,7 +58,7 @@ python examples/scripts/kto.py \
 from datasets import load_dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer, HfArgumentParser
 
-from trl import (
+from trl_run import (
     KTOConfig,
     KTOTrainer,
     ModelConfig,

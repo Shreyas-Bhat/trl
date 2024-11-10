@@ -20,7 +20,7 @@ import torch
 from parameterized import parameterized
 from transformers import AutoModel, AutoModelForCausalLM, AutoModelForSeq2SeqLM, GenerationConfig
 
-from trl import AutoModelForCausalLMWithValueHead, AutoModelForSeq2SeqLMWithValueHead, create_reference_model
+from trl_run import AutoModelForCausalLMWithValueHead, AutoModelForSeq2SeqLMWithValueHead, create_reference_model
 
 
 ALL_CAUSAL_LM_MODELS = [

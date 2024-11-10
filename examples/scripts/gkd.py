@@ -48,7 +48,7 @@ from accelerate import PartialState
 from datasets import load_dataset
 from transformers import AutoTokenizer, GenerationConfig
 
-from trl import (
+from trl_run import (
     GKDConfig,
     GKDTrainer,
     LogCompletionsCallback,

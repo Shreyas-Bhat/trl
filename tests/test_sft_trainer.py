@@ -30,7 +30,7 @@ from transformers import (
 from transformers.testing_utils import require_peft, require_vision
 from transformers.utils import is_peft_available
 
-from trl import SFTConfig, SFTTrainer
+from trl_run import SFTConfig, SFTTrainer
 from trl.trainer import ConstantLengthDataset, DataCollatorForCompletionOnlyLM
 
 

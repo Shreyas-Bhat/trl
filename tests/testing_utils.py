@@ -15,7 +15,7 @@ import unittest
 
 from transformers import is_sklearn_available, is_wandb_available
 
-from trl import is_diffusers_available, is_llm_blender_available
+from trl_run import is_diffusers_available, is_llm_blender_available
 
 
 def require_diffusers(test_case):

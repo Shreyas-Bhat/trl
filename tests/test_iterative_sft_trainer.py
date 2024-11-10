@@ -20,7 +20,7 @@ from datasets import Dataset
 from parameterized import parameterized
 from transformers import AutoModelForCausalLM, AutoModelForSeq2SeqLM, AutoTokenizer, TrainingArguments
 
-from trl import IterativeSFTTrainer
+from trl_run import IterativeSFTTrainer
 
 
 class IterativeTrainerTester(unittest.TestCase):

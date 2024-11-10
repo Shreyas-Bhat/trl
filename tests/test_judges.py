@@ -15,7 +15,7 @@
 import time
 import unittest
 
-from trl import HfPairwiseJudge, PairRMJudge, RandomPairwiseJudge, RandomRankJudge
+from trl_run import HfPairwiseJudge, PairRMJudge, RandomPairwiseJudge, RandomRankJudge
 
 from .testing_utils import require_llm_blender
 

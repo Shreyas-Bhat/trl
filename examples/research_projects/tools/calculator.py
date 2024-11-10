@@ -18,7 +18,7 @@ import numpy as np
 import torch
 from transformers import AutoTokenizer, load_tool
 
-from trl import AutoModelForCausalLMWithValueHead, PPOConfig, PPOTrainer, TextEnvironment
+from trl_run import AutoModelForCausalLMWithValueHead, PPOConfig, PPOTrainer, TextEnvironment
 
 
 def generate_data(n):

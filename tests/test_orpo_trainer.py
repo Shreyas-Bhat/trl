@@ -20,7 +20,7 @@ from parameterized import parameterized
 from transformers import AutoModelForCausalLM, AutoModelForSeq2SeqLM, AutoTokenizer
 from transformers.testing_utils import require_peft
 
-from trl import ORPOConfig, ORPOTrainer
+from trl_run import ORPOConfig, ORPOTrainer
 
 
 class ORPOTrainerTester(unittest.TestCase):

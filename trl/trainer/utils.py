@@ -50,7 +50,7 @@ from transformers.utils import (
 from ..import_utils import is_unsloth_available
 from ..trainer.model_config import ModelConfig
 
-
+device = "cuda" if torch.cuda.is_available() else "cpu"
 if is_peft_available():
     from peft import LoraConfig, PeftConfig
 
@@ -1192,6 +1192,7 @@ def first_true_indices(bools: torch.Tensor, dtype=torch.long):
 #         cross_entropy,
 #         sequence_lengths,
 #     )
+
 def get_reward(
     model: torch.nn.Module, 
     query_responses: torch.Tensor, 
@@ -1223,7 +1224,8 @@ def get_reward(
     with torch.no_grad():
         # Generate complete responses
         generated_outputs = model.generate(
-            **inputs,
+            # **inputs,
+            inputs["input_ids"],
             max_new_tokens=500,  # Adjust based on expected response length
             num_beams=1,       # Use greedy decoding
             do_sample=False,   # Don't use sampling
@@ -1420,7 +1422,8 @@ def generate(
     print("Checking shapes:", input_ids.shape, attention_mask.shape)
     print("Checking type:", input_ids.dtype, attention_mask.dtype)
     print("Checking device:", input_ids.device, attention_mask.device)
-    output = lm_backbone.generate(
+    print("input_ids", input_ids)
+    output = lm_backbone.bfloat16().generate(
         input_ids=input_ids,
         attention_mask=attention_mask,
         # position_ids=attention_mask.cumsum(1) - attention_mask.long(), # not needed: already adjusted in generations
@@ -1473,6 +1476,75 @@ def batch_generation(
 
     return padded_query_responses, padded_logitss
 
+# def batch_generation(
+#     model,
+#     queries,
+#     batch_size,
+#     pad_token_id,
+#     generation_config,
+# ):
+#     """Generate responses for batched queries with improved error handling."""
+    
+#     # Ensure all inputs are on the same device
+#     device = next(model.parameters()).device
+#     queries = queries.to(device)
+    
+#     # Create attention mask
+#     attention_mask = (queries != pad_token_id).to(device)
+    
+#     # Handle potential NaN/inf in the model
+#     for param in model.parameters():
+#         if torch.isnan(param.data).any() or torch.isinf(param.data).any():
+#             param.data = torch.nan_to_num(param.data, nan=0.0, posinf=1e4, neginf=-1e4)
+    
+#     try:
+#         with torch.no_grad():
+#             outputs = model.generate(
+#                 input_ids=queries,
+#                 attention_mask=attention_mask,
+#                 generation_config=generation_config,
+#                 return_dict_in_generate=True,
+#                 output_scores=True,
+#             )
+            
+#         # Stack scores if available
+#         if hasattr(outputs, 'scores') and outputs.scores:
+#             logits = torch.stack(outputs.scores, dim=1)
+#         else:
+#             # Create dummy logits if scores not available
+#             logits = torch.zeros(
+#                 (queries.shape[0], 1, model.config.vocab_size),
+#                 device=device
+#             )
+        
+#         return outputs.sequences, logits
+        
+#     except RuntimeError as e:
+#         if "probability tensor" in str(e):
+#             print("Attempting generation with modified parameters...")
+#             # Try with more conservative parameters
+#             modified_config = GenerationConfig(
+#                 max_new_tokens=10,
+#                 do_sample=True,
+#                 temperature=1.5,
+#                 top_k=20,
+#                 top_p=0.9,
+#                 pad_token_id=pad_token_id,
+#                 renormalize_logits=True
+#             )
+#             print("queries", queries)
+#             outputs = model.generate(
+#                 input_ids=queries,
+#                 attention_mask=attention_mask,
+#                 generation_config=modified_config,
+#                 return_dict_in_generate=True,
+#                 output_scores=True,
+#             )
+            
+#             logits = torch.stack(outputs.scores, dim=1)
+#             return outputs.sequences, logits
+#         else:
+#             raise e
 
 def add_bos_token_if_needed(
     bos_token_id: Optional[int],

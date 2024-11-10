@@ -50,7 +50,7 @@ import torch
 from datasets import load_dataset
 from transformers import AutoModelForSequenceClassification, AutoTokenizer, HfArgumentParser
 
-from trl import (
+from trl_run import (
     ModelConfig,
     RewardConfig,
     RewardTrainer,

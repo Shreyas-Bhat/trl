@@ -32,7 +32,7 @@ from transformers import (
     set_seed,
 )
 
-from trl import SFTConfig, SFTTrainer
+from trl_run import SFTConfig, SFTTrainer
 from trl.trainer import ConstantLengthDataset
 
 

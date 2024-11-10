@@ -23,7 +23,7 @@ from transformers import (
     HfArgumentParser,
 )
 
-from trl import ModelConfig, PPOConfig, PPOTrainer, ScriptArguments
+from trl_run import ModelConfig, PPOConfig, PPOTrainer, ScriptArguments
 from trl.trainer.utils import SIMPLE_CHAT_TEMPLATE
 
 
