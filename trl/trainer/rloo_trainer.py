@@ -15,6 +15,8 @@
 import gc
 import math
 import os
+os.environ['CUDA_DEVICE_ORDER']='PCI_BUS_ID'
+os.environ['CUDA_LAUNCH_BLOCKING'] = '0'
 import textwrap
 import time
 from collections import defaultdict
@@ -42,6 +44,8 @@ from transformers import (
     TrainerControl,
     is_wandb_available,
 )
+
+# torch.cuda.set_device(1)
 from transformers.integrations import get_reporting_integration_callbacks
 from transformers.trainer import DEFAULT_CALLBACKS, DEFAULT_PROGRESS_CALLBACK
 from transformers.trainer_callback import CallbackHandler, ExportableState, PrinterCallback
@@ -64,7 +68,7 @@ from .utils import generate_model_card
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 if is_wandb_available():
-    import wandb
+    import wandb # type: ignore
 
 INVALID_LOGPROB = 1.0
 
@@ -80,7 +84,7 @@ class RLOOTrainer(Trainer):
         ],
         policy: nn.Module,
         ref_policy: nn.Module,
-        reward_model: nn.Module,
+        # reward_model: nn.Module,
         train_dataset: Dataset,
         llm_decision_maker: nn.Module,
         data_collator: Optional[DataCollatorWithPadding] = None,
@@ -89,11 +93,11 @@ class RLOOTrainer(Trainer):
         optimizers: Tuple[torch.optim.Optimizer, torch.optim.lr_scheduler.LambdaLR] = (None, None),
         callbacks: Optional[List[TrainerCallback]] = None,
     ) -> None:
-        if ref_policy is policy:
-            raise ValueError(
-                "`policy` and `ref_policy` cannot be the same object. If you want `ref_policy` to be the "
-                "same as `policy`, you must mass a copy of it, or `None` if you use peft."
-            )
+        # if ref_policy is policy:
+        #     raise ValueError(
+        #         "`policy` and `ref_policy` cannot be the same object. If you want `ref_policy` to be the "
+        #         "same as `policy`, you must mass a copy of it, or `None` if you use peft."
+        #     )
 
         self.args = config
         args = config
@@ -107,7 +111,7 @@ class RLOOTrainer(Trainer):
         self.policy.generation_config.pad_token_id = None  # generate tokens without truncation / padding
 
         self.ref_policy = ref_policy
-        self.reward_model = reward_model
+        # self.reward_model = reward_model
         self.train_dataset = train_dataset
         self.train_dataset_len = len(train_dataset)
         self.data_collator = data_collator
@@ -137,7 +141,7 @@ class RLOOTrainer(Trainer):
         args.num_total_batches = math.ceil(
             args.total_episodes / args.batch_size
         )  # we may train for more than `total_episodes`
-        time_tensor = torch.tensor(int(time.time()), device=accelerator.device)
+        time_tensor = torch.tensor(int(time.time()), device=device)
         time_int = broadcast(time_tensor, 0).item()  # avoid different timestamps across processes
         args.run_name = f"{args.exp_name}__{args.seed}__{time_int}"
         self.local_seed = args.seed + accelerator.process_index * 100003  # Prime
@@ -150,7 +154,7 @@ class RLOOTrainer(Trainer):
         #########
         # setup model, optimizer, and others
         #########
-        for module in [policy, ref_policy, reward_model]:
+        for module in [policy, ref_policy]:
             disable_dropout_in_model(module)
         if args.stop_token and args.stop_token == "eos":
             args.stop_token_id = self.processing_class.eos_token_id
@@ -218,19 +222,18 @@ class RLOOTrainer(Trainer):
         self.eval_dataloader = accelerator.prepare(self.eval_dataloader)
 
         if self.is_deepspeed_enabled:
-            self.reward_model = prepare_deepspeed(
-                self.reward_model, args.per_device_train_batch_size, args.fp16, args.bf16
-            )
+            # self.reward_model = prepare_deepspeed(
+            #     self.reward_model, args.per_device_train_batch_size, args.fp16, args.bf16
+            # )
             self.ref_policy = prepare_deepspeed(
                 self.ref_policy, args.per_device_train_batch_size, args.fp16, args.bf16
             )
             # self.llm_decision_maker = self.llm_decision_maker.to(self.accelerator.device)
-            self.llm_decision_maker = self.llm_decision_maker.to(device)
+            self.llm_decision_maker = self.llm_decision_maker.to("cuda")
             self.deepspeed = self.model
         else:
-            self.ref_policy = self.ref_policy.to(self.accelerator.device)
-            self.reward_model = self.reward_model.to(self.accelerator.device)
-
+            self.ref_policy = self.ref_policy.to(device)
+            # self.reward_model = self.reward_model.to(device)
     def get_train_dataloader(self) -> DataLoader:
         return self.dataloader
 
@@ -244,10 +247,10 @@ class RLOOTrainer(Trainer):
         model = self.model
         self.model_wrapped = self.model
         ref_policy = self.ref_policy
-        reward_model = self.reward_model
+        # reward_model = self.reward_model
         processing_class = self.processing_class
         dataloader = self.dataloader
-        device = accelerator.device
+        device = "cuda"
 
         def repeat_generator():
             while True:
@@ -257,9 +260,9 @@ class RLOOTrainer(Trainer):
         generation_config = GenerationConfig(
             max_new_tokens=args.response_length,
             temperature=(args.temperature + 1e-7),
-            top_k=0.0,
-            top_p=1.0,
-            do_sample=True,
+            top_k=50,
+            # top_p=0.9,
+            do_sample=False, #change
         )
 
         accelerator.print("===training policy===")
@@ -302,7 +305,7 @@ class RLOOTrainer(Trainer):
             data = next(iter_dataloader)
             with torch.no_grad():
                 queries = data["input_ids"].to(device)
-                print("For the purposes of debugging, these are the queries:", queries)
+                # print("For the purposes of debugging, these are the queries:", queries)
                 ground_truth = data["labels"].to(device)
                 queries = queries.repeat(args.rloo_k, 1)
                 ground_truth = ground_truth.repeat(args.rloo_k, 1)
@@ -361,27 +364,29 @@ class RLOOTrainer(Trainer):
 
                     # Response Processing 2. run reward model on the truncated responses
                     postprocessed_query_response = torch.cat((query, postprocessed_response), 1)
-                    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2-0.5B")
+                    tokenizer = AutoTokenizer.from_pretrained("google/gemma-2-2b-it")
+                    tokenizer.padding_side = "left"
                     # Decode and print the components separately
-                    print("\n=== Query-Response Components ===")
-                    print("1. Original Query:")
-                    print("postprocessed_query_response", postprocessed_query_response)
-                    query_text = tokenizer.batch_decode(query, skip_special_tokens=True)
-                    for i, q in enumerate(query_text):
-                        print(f"Query {i+1}: {q}")
+                    if i%10==0:
+                        print("\n=== Query-Response Components ===")
+                        print("1. Original Query:")
+                        print("postprocessed_query_response", postprocessed_query_response)
+                        query_text = tokenizer.batch_decode(query, skip_special_tokens=True)
+                        for i, q in enumerate(query_text):
+                            print(f"Query {i+1}: {q}")
 
-                    print("\n2. Processed Response:")
-                    response_text = tokenizer.batch_decode(postprocessed_response, skip_special_tokens=True)
-                    for i, r in enumerate(response_text):
-                        print(f"Response {i+1}: {r}")
+                        print("\n2. Processed Response:")
+                        response_text = tokenizer.batch_decode(postprocessed_response, skip_special_tokens=True)
+                        for i, r in enumerate(response_text):
+                            print(f"Response {i+1}: {r}")
 
-                    print("\n3. Full Concatenated Query-Response:")
-                    full_text = tokenizer.batch_decode(postprocessed_query_response, skip_special_tokens=True)
-                    for i, text in enumerate(full_text):
-                        print(f"\nPair {i+1}:")
-                        print("=" * 50)
-                        print(text)
-                        print("=" * 50)
+                        # print("\n3. Full Concatenated Query-Response:")
+                        # full_text = tokenizer.batch_decode(postprocessed_query_response, skip_special_tokens=True)
+                        # for i, text in enumerate(full_text):
+                        #     print(f"\nPair {i+1}:")
+                        #     print("=" * 50)
+                        #     print(text)
+                        #     print("=" * 50)
                     # sequence_length = first_true_indices(postprocessed_response == processing_class.pad_token_id) - 1 #TODO: changing this line 
                     sequence_length = first_true_indices(postprocessed_response == processing_class.pad_token_id) - 1
                     llm_output = forward(self.llm_decision_maker, postprocessed_query_response, processing_class.pad_token_id) #TODO: changing this line 
@@ -389,7 +394,7 @@ class RLOOTrainer(Trainer):
                     llm_scores = llm_output
                     # print(f"The following are the llm_scores: {llm_scores}")
                     _, score, _ = get_reward(
-                        reward_model, postprocessed_query_response, processing_class.pad_token_id, context_length, llm_scores=llm_scores, ground_truth=ground_truth_batch, tokenizer=AutoTokenizer.from_pretrained("Qwen/Qwen2-0.5B")
+                        self.llm_decision_maker, postprocessed_query_response, processing_class.pad_token_id, context_length, llm_scores=llm_scores, ground_truth=ground_truth_batch, tokenizer=AutoTokenizer.from_pretrained("google/gemma-2-2b-it")
                     ) #TODO: changing this line 
                     # _, score, _ = get_reward(
                     #     reward_model, postprocessed_response, processing_class.pad_token_id, context_length, llm_scores=llm_scores, ground_truth=ground_truth_batch, tokenizer=AutoTokenizer.from_pretrained("Qwen/Qwen2-0.5B")
@@ -420,7 +425,7 @@ class RLOOTrainer(Trainer):
                 # accelerator.print(f"{scores=}, {(contain_eos_token.sum() / len(contain_eos_token))=}")
 
                 # be very careful with `padding_mask_p1`; see https://excalidraw.com/#json=LWnzG4w2k5DjF_EOL_xPt,e2w3a-hFJ_gX5vOfeyXGTw
-                response_idxs = torch.arange(responses.shape[1], device=responses.device).repeat(responses.shape[0], 1)
+                response_idxs = torch.arange(responses.shape[1], device=device).repeat(responses.shape[0], 1)
                 padding_mask = response_idxs > sequence_lengths.unsqueeze(1)
                 logprobs = torch.masked_fill(logprobs, padding_mask, INVALID_LOGPROB)
                 ref_logprobs = torch.masked_fill(ref_logprobs, padding_mask, INVALID_LOGPROB)
@@ -783,11 +788,11 @@ class RLOOTrainer(Trainer):
         
         generation_config = GenerationConfig(
             max_new_tokens=20,
-            do_sample=True,
+            do_sample=False, #change
             num_beams=1,
-            temperature=1.2,
+            temperature=0.7,
             top_k=50,
-            top_p=0.95,
+            # top_p=0.9,
             pad_token_id=processing_class.pad_token_id,
             renormalize_logits=True,
             no_repeat_ngram_size=3,
@@ -804,7 +809,7 @@ class RLOOTrainer(Trainer):
             
             for batch_idx, batch in enumerate(self.eval_dataloader):
                 query = batch["input_ids"]
-                ground_truth = batch["labels"].to(query.device)
+                ground_truth = batch["labels"].to(device)
                 
                 # queries_batch = query.repeat(args.rloo_k, 1)
                 # ground_truth = ground_truth.repeat(args.rloo_k, 1)
@@ -844,13 +849,13 @@ class RLOOTrainer(Trainer):
                     llm_scores = llm_output
                     
                     _, score, _ = get_reward(
-                        self.reward_model,
+                        self.llm_decision_maker,
                         postprocessed_query_response,
                         processing_class.pad_token_id,
                         context_length,
                         llm_scores=llm_scores,
                         ground_truth=ground_truth,
-                        tokenizer=AutoTokenizer.from_pretrained("Qwen/Qwen2-0.5B")
+                        tokenizer=AutoTokenizer.from_pretrained("google/gemma-2-2b-it")
                     )
                     
                     score_np = score.view(-1).float().cpu().numpy()

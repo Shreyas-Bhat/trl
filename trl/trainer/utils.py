@@ -11,6 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import os
+os.environ['CUDA_DEVICE_ORDER']='PCI_BUS_ID'
+os.environ['CUDA_LAUNCH_BLOCKING'] = '0'
 import dataclasses
 import importlib.resources as pkg_resources
 import json
@@ -28,11 +31,12 @@ import torch.utils.data
 from accelerate import Accelerator, PartialState
 from accelerate.state import AcceleratorState
 from huggingface_hub import ModelCard, ModelCardData
-from rich.console import Console
-from rich.table import Table
+from rich.console import Console # type: ignore
+from rich.table import Table # type: ignore
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import IterableDataset
 from transformers import (
+    AutoTokenizer,
     BitsAndBytesConfig,
     DataCollatorForLanguageModeling,
     GenerationConfig,
@@ -47,12 +51,15 @@ from transformers.utils import (
     is_torch_xpu_available,
 )
 
+# torch.cuda.set_device(1)
 from ..import_utils import is_unsloth_available
+# from trl.import_utils import is_unsloth_available
 from ..trainer.model_config import ModelConfig
+# from trl.trainer.model_config import ModelConfig
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 if is_peft_available():
-    from peft import LoraConfig, PeftConfig
+    from peft import LoraConfig, PeftConfig # type: ignore
 
 
 class AdaptiveKLController:
@@ -305,7 +312,7 @@ class DataCollatorForChatML:
             completion_start_idx = len(tokenized_prompt["input_ids"])
             label[completion_start_idx:] = input_ids[-1][completion_start_idx:]
             labels.append(label)
-
+            
         # convert to list of tensors and pad
         input_ids = [torch.tensor(ids, dtype=torch.long) for ids in input_ids]
         attention_mask = [torch.tensor(mask, dtype=torch.long) for mask in attention_mask]
@@ -438,7 +445,7 @@ def pad(tensors: List[torch.Tensor], padding_value: int = 0, padding_side: str =
     output_shape = np.max([t.shape for t in tensors], 0).tolist()
 
     # Create an output tensor filled with the padding value
-    output = torch.full((len(tensors), *output_shape), padding_value, dtype=tensors[0].dtype, device=tensors[0].device)
+    output = torch.full((len(tensors), *output_shape), padding_value, dtype=tensors[0].dtype, device=device)
 
     for i, t in enumerate(tensors):
         # Determine the slice for the sequence dimension
@@ -743,7 +750,7 @@ def get_global_statistics(
     https://github.com/OpenLMLab/MOSS-RLHF/blob/40b91eb2f2b71b16919addede0341d2bef70825d/utils.py#L57C1-L73C75
     """
     xs = xs.to(accelerator.device)
-    sum_and_count = torch.tensor([xs.sum(), (xs.numel() if mask is None else mask.sum())], device=xs.device)
+    sum_and_count = torch.tensor([xs.sum(), (xs.numel() if mask is None else mask.sum())], device=device)
     sum_and_count = accelerator.reduce(sum_and_count)
     global_sum, count = sum_and_count
     global_mean = global_sum / count
@@ -778,7 +785,7 @@ def pad_to_length(tensor: torch.Tensor, length: int, pad_value: Union[int, float
         return torch.cat(
             [
                 tensor,
-                pad_value * torch.ones(*pad_size, dtype=tensor.dtype, device=tensor.device),
+                pad_value * torch.ones(*pad_size, dtype=tensor.dtype, device=device),
             ],
             dim=dim,
         )
@@ -846,7 +853,8 @@ def peft_module_casting_to_bf16(model):
         elif any(x in name for x in ["lm_head", "embed_tokens", "wte", "wpe"]):
             if hasattr(module, "weight"):
                 if module.weight.dtype == torch.float32:
-                    module = module.to(torch.bfloat16)
+                    # module = module.to(torch.bfloat16)
+                    module = module.to(torch.bfloat8)
 
 
 def trl_sanitze_kwargs_for_tagging(model, tag_names, kwargs=None):
@@ -936,7 +944,7 @@ def get_exp_cap(value, decimal=4):
             so we cap the exponent to 88.7228 to avoid overflow.
     """
     vdtype_max = torch.zeros([1]).to(value.dtype) + torch.finfo(value.dtype).max
-    vdtype_log_max = torch.log(vdtype_max).to(value.device)
+    vdtype_log_max = torch.log(vdtype_max).to(device)
     return torch.floor(vdtype_log_max * 10**decimal) / 10**decimal if decimal > 0 else vdtype_log_max
 
 
@@ -1062,7 +1070,7 @@ def first_true_indices(bools: torch.Tensor, dtype=torch.long):
             in each row. If no True value is found in a row, returns the length of the row.
     """
     row_len = bools.size(-1)
-    zero_or_index = row_len * (~bools).type(dtype) + torch.arange(row_len, dtype=dtype, device=bools.device)
+    zero_or_index = row_len * (~bools).type(dtype) + torch.arange(row_len, dtype=dtype, device=device)
     return torch.min(zero_or_index, dim=-1).values
 
 
@@ -1208,27 +1216,28 @@ def get_reward(
     """
     attention_mask = query_responses != pad_token_id
     sequence_lengths = first_true_indices(query_responses[:, context_length:] == pad_token_id) - 1 + context_length
-    
+    tokenizer.padding_side = "left"
     # Convert tensor to text for LLM processing
     texts = []
     for i in range(query_responses.shape[0]):
         valid_tokens = query_responses[i][attention_mask[i]]
         if tokenizer:
             text = tokenizer.decode(valid_tokens)
-            prompt = f"Is this text positive or negative? Answer with only 'positive' or 'negative': {text}"
+            prompt = f"Is this text convey positive or negative sentiment? Answer with only 'positive' or 'negative': {text}"
             texts.append(prompt)
+            print("texts", texts)
             
-    device = next(model.parameters()).device
+    # device = next(model.parameters()).device
     inputs = tokenizer(texts, return_tensors="pt", padding=True, truncation=True).to(device)
     
     with torch.no_grad():
         # Generate complete responses
         generated_outputs = model.generate(
-            # **inputs,
-            inputs["input_ids"],
+            **inputs,
+            # inputs["input_ids"],
             max_new_tokens=500,  # Adjust based on expected response length
             num_beams=1,       # Use greedy decoding
-            do_sample=False,   # Don't use sampling
+            do_sample=True,   # Don't use sampling
             pad_token_id=tokenizer.pad_token_id,
             eos_token_id=tokenizer.eos_token_id,
             return_dict_in_generate=True,
@@ -1243,16 +1252,17 @@ def get_reward(
             generated_text = tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
             generated_texts.append(generated_text)
             
-        print("\nGenerated responses:")
-        for idx, (prompt, response) in enumerate(zip(texts, generated_texts)):
-            print(f"Input {idx}: {prompt}")
-            print(f"Output: {response}")
-            print("-" * 50)
+        # print("\nGenerated responses:")
+        # for idx, (prompt, response) in enumerate(zip(texts, generated_texts)):
+        #     print(f"Input {idx}: {prompt}")
+        #     print(f"Output: {response}")
+        #     print("-" * 50)
         
         # Convert responses to binary probabilities
         llm_probabilities = torch.zeros(ground_truth.shape[0]).to(device)
         for i, text in enumerate(generated_texts):
             text = text.lower().strip()
+            # print("text", text)
             # You might need to adjust this based on actual outputs
             if 'positive' in text:
                 llm_probabilities[i] = 0.80
@@ -1380,7 +1390,7 @@ def truncate_response(stop_token_id: int, pad_token_id: int, responses: torch.Te
     """
     trunc_idxs = first_true_indices(responses == stop_token_id).unsqueeze(-1)
     new_size = [1] * (len(responses.size()) - 1) + [responses.shape[1]]
-    idxs = torch.arange(responses.shape[1], device=responses.device).view(*new_size)
+    idxs = torch.arange(responses.shape[1], device=device).view(*new_size)
     postprocessed_responses = torch.masked_fill(responses, idxs > trunc_idxs, pad_token_id)
     return postprocessed_responses
 
@@ -1408,32 +1418,89 @@ def generate(
             - `logits` (`torch.Tensor`):
                 The logits output from the generation process.
     """
-    print("Queries shape:", queries.shape)
-    print("Queries device:", queries.device)
-    print("Unique token IDs in queries:", torch.unique(queries).tolist())
-    print("Pad token ID:", pad_token_id)
-    print("Generation config:", vars(generation_config))
+    # print("Queries shape:", queries.shape)
+    # print("Queries device:", queries.device)
+    # print("Unique token IDs in queries:", torch.unique(queries).tolist())
+    # print("Pad token ID:", pad_token_id)
+    # print("Generation config:", vars(generation_config))
     context_length = queries.shape[1]
     attention_mask = queries != pad_token_id
-    print("Number of padding tokens:", (queries == pad_token_id).sum().item())
-    print("Number of non-padding tokens:", (queries != pad_token_id).sum().item())
-    print("Generation config pad_token_id:", generation_config.pad_token_id)
-    input_ids = torch.masked_fill(queries, ~attention_mask, 0)
-    print("Checking shapes:", input_ids.shape, attention_mask.shape)
-    print("Checking type:", input_ids.dtype, attention_mask.dtype)
-    print("Checking device:", input_ids.device, attention_mask.device)
-    print("input_ids", input_ids)
-    output = lm_backbone.bfloat16().generate(
-        input_ids=input_ids,
-        attention_mask=attention_mask,
-        # position_ids=attention_mask.cumsum(1) - attention_mask.long(), # not needed: already adjusted in generations
-        # https://github.com/huggingface/transformers/blob/ac33aeeeee2a7a89b89c93c2962e6feb90daef0a/src/transformers/models/gpt2/modeling_gpt2.py#L1227-L1250
+    attention_mask = attention_mask.to(device)
+    # print("Number of padding tokens:", (queries == pad_token_id).sum().item())
+    # print("Number of non-padding tokens:", (queries != pad_token_id).sum().item())
+    # print("Generation config pad_token_id:", generation_config.pad_token_id)
+    input_ids = torch.masked_fill(queries, ~attention_mask, 0).to(device)
+    # print("Checking shapes:", input_ids.shape, attention_mask.shape)
+    # print("Checking type:", input_ids.dtype, attention_mask.dtype)
+    # print("Checking device:", input_ids.device, attention_mask.device)
+    # print("input_ids", input_ids)
+    original_texts = []
+    tokenizer = AutoTokenizer.from_pretrained("google/gemma-2-2b-it")
+    tokenizer.padding_side = "left"
+    for i in range(queries.shape[0]):
+        valid_tokens = input_ids[i][attention_mask[i]]
+        text = tokenizer.decode(valid_tokens, skip_special_tokens=True)
+        original_texts.append(text)
+    summary_prompts = []
+    for text in original_texts:
+        prompt=f"Please provide a brief summary of the following text:\n\n{text}\n\nSummary:"
+        summary_prompts.append(prompt)
+    print("summary prompts", summary_prompts)
+    # breakpoint()
+    summary_inputs = tokenizer(
+        summary_prompts,
+        padding=True,
+        truncation=True,
+        return_tensors="pt",
+        max_length=256
+    ).to(device)
+    # with torch.cuda.amp.autocast(True):[]
+    # Check your inputs first
+    print("Input shape:", summary_inputs['input_ids'].shape)
+    print("Attention mask shape:", summary_inputs['attention_mask'].shape)
+    print("Sample of attention mask:", summary_inputs['attention_mask'][0][:50])
+
+    # Add checks for special tokens
+    print("First token:", summary_inputs['input_ids'][0][0])  # Should be BOS token if used
+    print("Sample sequence:", summary_inputs['input_ids'][0][:50])
+
+    # Verify no empty sequences
+    print("Any empty sequences?", (summary_inputs['attention_mask'].sum(dim=1) == 0).any())
+
+    # Check for numerical issues
+    print("Device:", summary_inputs['input_ids'].device)
+    print("Dtype:", lm_backbone.dtype)
+
+    # You might want to try fp32 instead of bfloat16 to test if it's a precision issue
+    # test_output = lm_backbone.float().generate(...)
+    summary_output = lm_backbone.generate( #I changed sampling to False here 
+        **summary_inputs,  # Unpack all inputs including input_ids and attention_mask
+        num_beams=1,
         generation_config=generation_config,
         return_dict_in_generate=True,
         output_scores=True,
     )
-    logits = torch.stack(output.scores, 1)
-    return torch.cat((queries, output.sequences[:, context_length:]), dim=1), logits
+    # summary_output = lm_backbone.bfloat16().cuda().generate(
+    #     # input_ids=input_ids,
+    #     input_ids=summary_inputs.input_ids,
+    #     attention_mask=summary_inputs.attention_mask,
+    #     # position_ids=attention_mask.cumsum(1) - attention_mask.long(), # not needed: already adjusted in generations
+    #     # https://github.com/huggingface/transformers/blob/ac33aeeeee2a7a89b89c93c2962e6feb90daef0a/src/transformers/models/gpt2/modeling_gpt2.py#L1227-L1250
+    #     generation_config=generation_config,
+    #     return_dict_in_generate=True,
+    #     output_scores=True,
+    # )
+    # print("summary output", summary_output)
+    summary_texts = []
+    for summary_ids in summary_output.sequences:
+        summary = tokenizer.decode(
+            summary_ids[summary_inputs.input_ids.shape[1]:],
+            skip_special_tokens = True
+        ).strip()
+        print("summary follsz:", summary)
+        summary_texts.append(summary)
+    logits = torch.stack(summary_output.scores, 1)
+    return torch.cat((queries, summary_output.sequences[:, context_length:]), dim=1), logits
 
 
 @torch.no_grad()
@@ -1444,9 +1511,9 @@ def batch_generation(
     pad_token_id: int,
     generation_config: GenerationConfig,
 ):
-    print("Model device:", next(model.parameters()).device)
-    print("Queries max token ID:", queries.max().item())
-    print("Queries min token ID:", queries.min().item())
+    # print("Model device:", next(model.parameters()).device)
+    # print("Queries max token ID:", queries.max().item())
+    # print("Queries min token ID:", queries.min().item())
     query_responses = []
     logitss = []
     batch_size = queries.shape[0]
@@ -1467,8 +1534,8 @@ def batch_generation(
         logitss.append(logits)
 
     # padding tensors
-    padded_query_responses = pad(query_responses, padding_value=pad_token_id, padding_side="right")
-    padded_logitss = pad(logitss, padding_value=0, padding_side="right")
+    padded_query_responses = pad(query_responses, padding_value=pad_token_id, padding_side="left")
+    padded_logitss = pad(logitss, padding_value=0, padding_side="left")
 
     # reshaping
     padded_query_responses = padded_query_responses.view(-1, padded_query_responses.shape[-1])[:batch_size]
@@ -1603,7 +1670,7 @@ def truncate_right(
     """
     trunc_idxs = first_true_indices(input_ids == stop_token_id).unsqueeze(-1)
     new_size = [1] * (len(input_ids.size()) - 1) + [input_ids.shape[1]]
-    idxs = torch.arange(input_ids.shape[1], device=input_ids.device).view(*new_size)
+    idxs = torch.arange(input_ids.shape[1], device=device).view(*new_size)
     output_ids = torch.masked_fill(input_ids, idxs > trunc_idxs, pad_token_id)
     mask = torch.masked_fill(torch.ones_like(input_ids), idxs > trunc_idxs, 0)
     return output_ids, mask
