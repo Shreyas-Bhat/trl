@@ -15,8 +15,8 @@
 import gc
 import math
 import os
-os.environ['CUDA_DEVICE_ORDER']='PCI_BUS_ID'
-os.environ['CUDA_LAUNCH_BLOCKING'] = '0'
+# os.environ['CUDA_DEVICE_ORDER']='PCI_BUS_ID'
+# os.environ['CUDA_LAUNCH_BLOCKING'] = '0'
 import textwrap
 import time
 from collections import defaultdict
@@ -228,8 +228,8 @@ class RLOOTrainer(Trainer):
             self.ref_policy = prepare_deepspeed(
                 self.ref_policy, args.per_device_train_batch_size, args.fp16, args.bf16
             )
-            # self.llm_decision_maker = self.llm_decision_maker.to(self.accelerator.device)
-            self.llm_decision_maker = self.llm_decision_maker.to("cuda")
+            self.llm_decision_maker = self.llm_decision_maker.to(self.accelerator.device)
+            # self.llm_decision_maker = self.llm_decision_maker.to("cuda")
             self.deepspeed = self.model
         else:
             self.ref_policy = self.ref_policy.to(device)

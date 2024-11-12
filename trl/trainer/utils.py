@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
-os.environ['CUDA_DEVICE_ORDER']='PCI_BUS_ID'
-os.environ['CUDA_LAUNCH_BLOCKING'] = '0'
+# os.environ['CUDA_DEVICE_ORDER']='PCI_BUS_ID'
+# os.environ['CUDA_LAUNCH_BLOCKING'] = '0'
 import dataclasses
 import importlib.resources as pkg_resources
 import json
