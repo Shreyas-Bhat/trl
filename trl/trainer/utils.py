@@ -1226,7 +1226,7 @@ def get_reward(
             prompt = f"Is this text convey positive or negative sentiment? Answer with only 'positive' or 'negative': {text}"
             texts.append(prompt)
             print("texts", texts)
-            
+    # tokenizer.add_special_tokens({'pad_token': '[PAD]'})
     # device = next(model.parameters()).device
     inputs = tokenizer(texts, return_tensors="pt", padding=True, truncation=True).to(device)
     
@@ -1437,6 +1437,7 @@ def generate(
     original_texts = []
     tokenizer = AutoTokenizer.from_pretrained("google/gemma-2-2b-it")
     tokenizer.padding_side = "left"
+    # tokenizer.add_special_tokens({'pad_token': '[PAD]'})
     for i in range(queries.shape[0]):
         valid_tokens = input_ids[i][attention_mask[i]]
         text = tokenizer.decode(valid_tokens, skip_special_tokens=True)
