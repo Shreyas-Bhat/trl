@@ -257,13 +257,29 @@ class RLOOTrainer(Trainer):
                 yield from dataloader
 
         iter_dataloader = iter(repeat_generator())
-        generation_config = GenerationConfig(
-            max_new_tokens=args.response_length,
-            temperature=(args.temperature + 1e-7),
+        # generation_config = GenerationConfig(
+        #     # max_new_tokens=args.response_length,
+        #     max_new_tokens = 200,
+        #     temperature=(args.temperature + 1e-7),
+        #     top_k=50,
+        #     # top_p=0.9,
+        #     do_sample=True, #change
+        # )
+        tokenizer = AutoTokenizer.from_pretrained("TinyLlama/TinyLlama-1.1B-Chat-v1.0")
+        generation_config =  GenerationConfig(
+            temperature=1.0,  # Try with temperature 1.0 first
             top_k=50,
-            # top_p=0.9,
-            do_sample=False, #change
-        )
+            do_sample=True,
+            top_p=0.9,
+            pad_token_id=tokenizer.pad_token_id,
+            bos_token_id=tokenizer.bos_token_id,
+            eos_token_id=tokenizer.eos_token_id,
+            min_new_tokens=1,
+            max_new_tokens=200,
+            num_return_sequences=1,
+            output_scores=True,
+            return_dict_in_generate=True,
+            )
 
         accelerator.print("===training policy===")
         start_time = time.time()
@@ -310,6 +326,7 @@ class RLOOTrainer(Trainer):
                 queries = queries.repeat(args.rloo_k, 1)
                 ground_truth = ground_truth.repeat(args.rloo_k, 1)
                 context_length = queries.shape[1]
+                # context_length = 10
                 query_responses = []
                 responses = []
                 postprocessed_responses = []
@@ -341,6 +358,7 @@ class RLOOTrainer(Trainer):
                     query_response = query_responses[i : i + args.local_rollout_forward_batch_size]
                     response = query_response[:, context_length:]
                     logits = logitss[i : i + args.local_rollout_forward_batch_size]
+                    # logits = logits[:, :response.shape[1], :]
                     all_logprob = F.log_softmax(logits, dim=-1)
                     logprob = torch.gather(all_logprob, 2, response.unsqueeze(-1)).squeeze(-1)
                     # print("log prob and all logprob", all_logprob.shape, logprob.shape) 
@@ -364,7 +382,7 @@ class RLOOTrainer(Trainer):
 
                     # Response Processing 2. run reward model on the truncated responses
                     postprocessed_query_response = torch.cat((query, postprocessed_response), 1)
-                    tokenizer = AutoTokenizer.from_pretrained("google/gemma-2-2b-it")
+                    tokenizer = AutoTokenizer.from_pretrained("TinyLlama/TinyLlama-1.1B-Chat-v1.0")
                     tokenizer.padding_side = "left"
                     # Decode and print the components separately
                     if i%10==0:
@@ -394,7 +412,7 @@ class RLOOTrainer(Trainer):
                     llm_scores = llm_output
                     # print(f"The following are the llm_scores: {llm_scores}")
                     _, score, _ = get_reward(
-                        self.llm_decision_maker, postprocessed_query_response, processing_class.pad_token_id, context_length, llm_scores=llm_scores, ground_truth=ground_truth_batch, tokenizer=AutoTokenizer.from_pretrained("google/gemma-2-2b-it")
+                        self.llm_decision_maker, postprocessed_query_response, processing_class.pad_token_id, context_length, llm_scores=llm_scores, ground_truth=ground_truth_batch, tokenizer=AutoTokenizer.from_pretrained("TinyLlama/TinyLlama-1.1B-Chat-v1.0")
                     ) #TODO: changing this line 
                     # _, score, _ = get_reward(
                     #     reward_model, postprocessed_response, processing_class.pad_token_id, context_length, llm_scores=llm_scores, ground_truth=ground_truth_batch, tokenizer=AutoTokenizer.from_pretrained("Qwen/Qwen2-0.5B")
@@ -434,7 +452,8 @@ class RLOOTrainer(Trainer):
                 kl = logprobs - ref_logprobs
                 non_score_reward = (-args.kl_coef * kl).sum(1)
                 # print("Shape of scores and non_score", scores, non_score_reward) #TODO: remove
-                rlhf_reward = scores + non_score_reward
+                # rlhf_reward = scores
+                rlhf_reward = scores  + non_score_reward
 
                 # vectorized RLOO advantages implementation
                 rlhf_reward = rlhf_reward.reshape(args.rloo_k, -1)
@@ -462,29 +481,44 @@ class RLOOTrainer(Trainer):
 
                             output = forward(model, mb_query_responses, processing_class.pad_token_id)
                             logits = output.logits[:, context_length - 1 : -1]
-                            logits /= args.temperature + 1e-7
+                            # logits = torch.clamp(logits, -1, 1)
+                            # logits /= args.temperature + 1e-7
                             new_all_logprobs = F.log_softmax(logits, dim=-1)
                             new_logprobs = torch.gather(new_all_logprobs, 2, mb_responses.unsqueeze(-1)).squeeze(-1)
                             new_logprobs = torch.masked_fill(
                                 new_logprobs, padding_mask[micro_batch_inds], INVALID_LOGPROB
                             )
-                            new_ratio = (new_logprobs - mb_logprobs).exp()
-                            new_logprobs = new_logprobs.sum(1)
-                            mb_logprobs = mb_logprobs.sum(1)
+                            # new_ratio = (new_logprobs - mb_logprobs).exp()
+                            new_ratio = torch.clamp(torch.exp(new_logprobs - mb_logprobs), max=1.2)
+                            # new_logprobs = new_logprobs.sum(1)
+                            # mb_logprobs = mb_logprobs.sum(1)
+                            new_logprobs = new_logprobs.mean(1)  # instead of sum(1)
+                            mb_logprobs = mb_logprobs.mean(1)    # instead of sum(1)
                             logprobs_diff = new_logprobs - mb_logprobs
-                            ratio = torch.exp(logprobs_diff)
+                            # ratio = torch.exp(logprobs_diff)
+                            # ratio = torch.clamp(torch.exp(logprobs_diff), max=1.2)
+                            # ratio = torch.exp(logprobs_diff + 1e-8)
+                            ratio = logprobs_diff
+
+                            # ratio = torch.tensor([1.0], device=device, requires_grad=True)
                             pg_losses = -mb_advantage * ratio
                             pg_losses2 = -mb_advantage * torch.clamp(ratio, 1.0 - args.cliprange, 1.0 + args.cliprange)
                             pg_loss_max = torch.max(pg_losses, pg_losses2)
                             pg_loss = pg_loss_max.mean()
+                            # pg_loss = torch.clamp(pg_loss_max.mean(), -10.0, 10.0)
+                            # pg_loss = torch.tensor([10.0], device=device) 
                             loss = pg_loss
                             accelerator.backward(loss)
+                            grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 0.2)
+                            if grad_norm > 0.2:
+                                print(f"Gradient norm before clipping:{grad_norm}")
                             optimizer.step()
                             optimizer.zero_grad()
                             with torch.no_grad():
                                 pg_clipfrac = (pg_losses2 > pg_losses).float().mean()
                                 prob_dist = torch.nn.functional.softmax(logits, dim=-1)
                                 entropy = torch.logsumexp(logits, dim=-1) - torch.sum(prob_dist * logits, dim=-1)
+                                # entropy = 10.0
                                 approxkl = 0.5 * (logprobs_diff**2).mean()
                                 approxkl_stats[ppo_epoch_idx, minibatch_idx, gradient_accumulation_idx] = approxkl
                                 pg_clipfrac_stats[ppo_epoch_idx, minibatch_idx, gradient_accumulation_idx] = (
@@ -507,12 +541,29 @@ class RLOOTrainer(Trainer):
                     # fmt: on
                     torch.cuda.empty_cache()
             with torch.no_grad():
+                weight_stats = {
+                    'max': float('-inf'),
+                    'min': float('-inf'),
+                    'mean': 0.0
+                }
+                total_params = 0
+                for name, param in model.named_parameters():
+                    if param.requires_grad:
+                        weight_stats['max'] = max(weight_stats['max'], param.max().item())
+                        weight_stats['min'] = min(weight_stats['min'], param.min().item())
+                        weight_stats['mean'] += param.mean().item() * param.numel()
+                        total_params += param.numel()
+                
+                weight_stats['mean'] /= total_params
                 mean_kl = kl.sum(1).mean()
                 mean_entropy = (-logprobs).sum(1).mean()
                 mean_non_score_reward = non_score_reward.mean()
                 eps = int(self.state.episode / (time.time() - start_time))
                 metrics = {}
                 metrics["eps"] = eps
+                metrics["weights/max"] = weight_stats['max']
+                metrics["weights/min"] = weight_stats['min']
+                metrics["weights/mean"] = weight_stats['mean']
                 metrics["objective/kl"] = self.accelerator.gather(mean_kl).mean().item()
                 metrics["objective/entropy"] = self.accelerator.gather(mean_entropy).mean().item()
                 metrics["objective/non_score_reward"] = self.accelerator.gather(mean_non_score_reward).mean().item()
@@ -542,8 +593,8 @@ class RLOOTrainer(Trainer):
             torch.cuda.empty_cache()
             gc.collect()
 
-            if args.num_sample_generations > 0 and (update - 1) % self.sample_generations_freq == 0:
-                self.generate_completions(sampling=True) #TODO: print this back
+            # if args.num_sample_generations > 0 and (update - 1) % self.sample_generations_freq == 0:
+            #     self.generate_completions(sampling=True) #TODO: print this back
 
         # HF trainer specifics
         self.control = self.callback_handler.on_train_end(args, self.state, self.control)
@@ -787,12 +838,12 @@ class RLOOTrainer(Trainer):
         processing_class = self.processing_class
         
         generation_config = GenerationConfig(
-            max_new_tokens=20,
-            do_sample=False, #change
+            max_new_tokens=200,
+            do_sample=True, #change
             num_beams=1,
             temperature=0.7,
             top_k=50,
-            # top_p=0.9,
+            top_p=0.9,
             pad_token_id=processing_class.pad_token_id,
             renormalize_logits=True,
             no_repeat_ngram_size=3,
@@ -855,7 +906,7 @@ class RLOOTrainer(Trainer):
                         context_length,
                         llm_scores=llm_scores,
                         ground_truth=ground_truth,
-                        tokenizer=AutoTokenizer.from_pretrained("google/gemma-2-2b-it")
+                        tokenizer=AutoTokenizer.from_pretrained("TinyLlama/TinyLlama-1.1B-Chat-v1.0")
                     )
                     
                     score_np = score.view(-1).float().cpu().numpy()

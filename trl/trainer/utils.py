@@ -853,8 +853,8 @@ def peft_module_casting_to_bf16(model):
         elif any(x in name for x in ["lm_head", "embed_tokens", "wte", "wpe"]):
             if hasattr(module, "weight"):
                 if module.weight.dtype == torch.float32:
-                    # module = module.to(torch.bfloat16)
-                    module = module.to(torch.bfloat8)
+                    module = module.to(torch.bfloat16)
+                    # module = module.to(torch.bfloat8)
 
 
 def trl_sanitze_kwargs_for_tagging(model, tag_names, kwargs=None):
@@ -1035,7 +1035,8 @@ class OnPolicyConfig(TrainingArguments):
     total_episodes: Optional[int] = None
     local_rollout_forward_batch_size: int = 64
     num_sample_generations: int = 10
-    response_length: int = 512
+    # response_length: int = 512
+    response_length: int = 128
     stop_token: Optional[Literal["eos"]] = None
     stop_token_id: Optional[int] = None
     temperature: float = 0.7
@@ -1214,36 +1215,57 @@ def get_reward(
     Computes the reward using LLM sentiment classification.
     Returns 0.95 for positive sentiment, 0.05 for negative sentiment.
     """
-    attention_mask = query_responses != pad_token_id
+    attention_mask = query_responses != tokenizer.pad_token_id
+    # query_responses = query_responses[attention_mask]
+    # query_responses = query_responses[query_responses != tokenizer.eos_token_id]
     sequence_lengths = first_true_indices(query_responses[:, context_length:] == pad_token_id) - 1 + context_length
     tokenizer.padding_side = "left"
+    tokenizer.pad_token = tokenizer.eos_token
     # Convert tensor to text for LLM processing
     texts = []
     for i in range(query_responses.shape[0]):
-        valid_tokens = query_responses[i][attention_mask[i]]
+        valid_tokens = query_responses[i][attention_mask[i]][context_length:]
         if tokenizer:
             text = tokenizer.decode(valid_tokens)
-            prompt = f"Is this text convey positive or negative sentiment? Answer with only 'positive' or 'negative': {text}"
+            prompt = f"Respond only in English: What sentiment does this {text} convey? Strictly answer if it is positive or negative and nothing else. You have no other option other than answering the question."
             texts.append(prompt)
             print("texts", texts)
     # tokenizer.add_special_tokens({'pad_token': '[PAD]'})
+    
+    # tokenizer.padding_side = 'left'
     # device = next(model.parameters()).device
     inputs = tokenizer(texts, return_tensors="pt", padding=True, truncation=True).to(device)
-    
+    model.eval()
     with torch.no_grad():
         # Generate complete responses
+        # generated_outputs = model.bfloat16().generate(
+        #     **inputs,
+        #     # inputs["input_ids"],
+        #     max_new_tokens=200,  # Adjust based on expected response length
+        #     num_beams=1,       # Use greedy decoding
+        #     do_sample=True,   # Don't use sampling
+        #     pad_token_id=tokenizer.pad_token_id,
+        #     eos_token_id=tokenizer.eos_token_id,
+        #     return_dict_in_generate=True,
+        #     output_scores=True  # Get the scores for each token
+        # )
         generated_outputs = model.generate(
             **inputs,
+            remove_invalid_values=True,
             # inputs["input_ids"],
-            max_new_tokens=500,  # Adjust based on expected response length
+            max_new_tokens=200,  # Adjust based on expected response length
+            min_length = 2,
             num_beams=1,       # Use greedy decoding
             do_sample=True,   # Don't use sampling
             pad_token_id=tokenizer.pad_token_id,
+            top_k = 50,
+            top_p = 0.9,
+            temperature = 0.7, 
             eos_token_id=tokenizer.eos_token_id,
             return_dict_in_generate=True,
+            suppress_tokens=[tokenizer.eos_token_id],
             output_scores=True  # Get the scores for each token
         )
-        
         # Decode the generated sequences
         generated_texts = []
         for output_ids in generated_outputs.sequences:
@@ -1259,22 +1281,88 @@ def get_reward(
         #     print("-" * 50)
         
         # Convert responses to binary probabilities
-        llm_probabilities = torch.zeros(ground_truth.shape[0]).to(device)
+        # llm_probabilities = torch.zeros(ground_truth.shape[0]).to(device)
+        # for i, text in enumerate(generated_texts):
+        #     text = text.lower().strip()
+        #     # print("text", text)
+        #     # You might need to adjust this based on actual outputs
+        #     if 'positive' in text:
+        #         llm_probabilities[i] = 0.80
+        #     elif 'negative' in text:
+        #         llm_probabilities[i] = 0.20
+        positive_id = tokenizer.encode(' positive', add_special_tokens=False)[0]
+        negative_id = tokenizer.encode(' negative', add_special_tokens=False)[0]
+
+        # Initialize probabilities tensor
+        llm_probabilities = torch.zeros(len(generated_texts)).to(device)
+
         for i, text in enumerate(generated_texts):
             text = text.lower().strip()
-            # print("text", text)
-            # You might need to adjust this based on actual outputs
-            if 'positive' in text:
-                llm_probabilities[i] = 0.80
-            else:
-                llm_probabilities[i] = 0.15
-    
-    # Compute cross entropy loss
-    ground_truth = ground_truth.float().view(-1,1)
-    llm_probabilities = llm_probabilities.float().view(-1,1)
-    epsilon = 1e-7
-    cross_entropy = -ground_truth * torch.log(llm_probabilities + epsilon) - \
-                   (1 - ground_truth) * torch.log(1 - llm_probabilities + epsilon)
+            print(f"\nText {i}: {text}")
+            # Find the position of "positive" or "negative" in the generated text
+            token_ids = tokenizer.encode(text, add_special_tokens=False)
+            tokens = tokenizer.convert_ids_to_tokens(token_ids)
+            print("Token IDs:", token_ids)
+            print("Tokens:", tokens)
+            # pos_tokens = tokenizer.encode('positive', add_special_tokens=False)
+            # neg_tokens = tokenizer.encode('negative', add_special_tokens=False)
+            # print("'positive' token ids:", pos_tokens)
+            # print("'negative' token ids:", neg_tokens)
+            # print("'positive' tokens:", tokenizer.convert_ids_to_tokens(pos_tokens))
+            # print("'negative' tokens:", tokenizer.convert_ids_to_tokens(neg_tokens))
+            pos_variants = [
+                tokenizer.encode('positive', add_special_tokens=False)[0],
+                tokenizer.encode(' positive', add_special_tokens=False)[0],
+                tokenizer.encode('Positive', add_special_tokens=False)[0],
+                tokenizer.encode(' Positive', add_special_tokens=False)[0]
+            ]
+            neg_variants = [
+                tokenizer.encode('negative', add_special_tokens=False)[0],
+                tokenizer.encode(' negative', add_special_tokens=False)[0],
+                tokenizer.encode('Negative', add_special_tokens=False)[0],
+                tokenizer.encode(' Negative', add_special_tokens=False)[0]
+            ]
+
+            # Remove duplicates and print for debugging
+            pos_variants = list(set(pos_variants))
+            neg_variants = list(set(neg_variants))
+            print("Positive token variants:", pos_variants)
+            print("Negative token variants:", neg_variants)
+
+            llm_probabilities = torch.zeros(len(generated_texts)).to(device)
+
+            for i, text in enumerate(generated_texts):
+                text = text.lower().strip()
+                token_ids = tokenizer.encode(text, add_special_tokens=False)
+                
+                # Check for any variant of positive
+                pos_positions = [i for i, t in enumerate(token_ids) if t in pos_variants]
+                if pos_positions:
+                    pos = pos_positions[0]  # Take first occurrence
+                    logits = generated_outputs.scores[pos]
+                    probs = torch.softmax(logits[i], dim=-1)
+                    # Sum probabilities for all positive variants
+                    prob = sum(probs[token_id].item() for token_id in pos_variants)
+                    llm_probabilities[i] = prob
+                
+                # Check for any variant of negative
+                neg_positions = [i for i, t in enumerate(token_ids) if t in neg_variants]
+                if neg_positions:
+                    pos = neg_positions[0]
+                    logits = generated_outputs.scores[pos]
+                    probs = torch.softmax(logits[i], dim=-1)
+                    # Sum probabilities for all negative variants
+                    prob = sum(probs[token_id].item() for token_id in neg_variants)
+                    llm_probabilities[i] = -prob 
+
+        # Reshape and calculate CE
+        llm_probabilities = llm_probabilities.view(-1, 1)
+        ground_truth = ground_truth.float().view(-1, 1)
+
+        epsilon = 1e-7
+        cross_entropy = -ground_truth * torch.log(llm_probabilities.abs() + epsilon) - \
+                    (1 - ground_truth) * torch.log(1 - llm_probabilities.abs() + epsilon)
+    # cross_entropy = torch.tensor([0.0], device=device)
     
     print("\nMetrics:")
     print("Ground truth:", ground_truth)
@@ -1425,7 +1513,7 @@ def generate(
     # print("Generation config:", vars(generation_config))
     context_length = queries.shape[1]
     attention_mask = queries != pad_token_id
-    attention_mask = attention_mask.to(device)
+    # attention_mask = attention_mask.to(device)
     # print("Number of padding tokens:", (queries == pad_token_id).sum().item())
     # print("Number of non-padding tokens:", (queries != pad_token_id).sum().item())
     # print("Generation config pad_token_id:", generation_config.pad_token_id)
@@ -1435,9 +1523,12 @@ def generate(
     # print("Checking device:", input_ids.device, attention_mask.device)
     # print("input_ids", input_ids)
     original_texts = []
-    tokenizer = AutoTokenizer.from_pretrained("google/gemma-2-2b-it")
+    tokenizer = AutoTokenizer.from_pretrained("TinyLlama/TinyLlama-1.1B-Chat-v1.0")
     tokenizer.padding_side = "left"
-    # tokenizer.add_special_tokens({'pad_token': '[PAD]'})
+    # tokenizer.add_special_tokens({'pad_token': '[PAD]'})\
+    tokenizer.pad_token = tokenizer.eos_token
+    tokenizer.pad_token_id = tokenizer.eos_token_id
+    # tokenizer.padding_side = 'left'
     for i in range(queries.shape[0]):
         valid_tokens = input_ids[i][attention_mask[i]]
         text = tokenizer.decode(valid_tokens, skip_special_tokens=True)
@@ -1453,8 +1544,9 @@ def generate(
         padding=True,
         truncation=True,
         return_tensors="pt",
-        max_length=256
+        max_length=128
     ).to(device)
+    
     # with torch.cuda.amp.autocast(True):[]
     # Check your inputs first
     print("Input shape:", summary_inputs['input_ids'].shape)
@@ -1474,13 +1566,43 @@ def generate(
 
     # You might want to try fp32 instead of bfloat16 to test if it's a precision issue
     # test_output = lm_backbone.float().generate(...)
-    summary_output = lm_backbone.generate( #I changed sampling to False here 
-        **summary_inputs,  # Unpack all inputs including input_ids and attention_mask
-        num_beams=1,
-        generation_config=generation_config,
+    torch.cuda.empty_cache()
+    # lm_backbone.eval()
+    # weights = torch.cat([p.data.flatten() for p in lm_backbone.parameters()])
+    # print(weights.shape)
+    # summary_output = lm_backbone.generate( #I changed sampling to False here 
+    #     **summary_inputs,  # Unpack all inputs including input_ids and attention_mask
+    #     # num_beams=1,
+    #     # remove_invalid_values=True,
+    #     do_sample=True,
+    #     generation_config=generation_config,
+    #     return_dict_in_generate=True,
+    #     output_scores=True,
+        
+    # )
+    generation_config = GenerationConfig(
+        max_new_tokens=200,
+        temperature=0.7,
+        do_sample=True,
+        top_k=50,
+        top_p=0.9,
+        min_length = 2,
+        no_repeat_ngram_size=3,
+        pad_token_id=tokenizer.pad_token_id,
+        eos_token_id=tokenizer.eos_token_id,
         return_dict_in_generate=True,
+        suppress_tokens=[tokenizer.eos_token_id],
         output_scores=True,
     )
+    summary_output = lm_backbone.generate(
+            **summary_inputs,
+            generation_config=generation_config
+        )
+    vocab_size = lm_backbone.config.vocab_size
+    vocab_mask = torch.ones(vocab_size, dtype=torch.bool, device=device)
+    if tokenizer.pad_token_id is not None:
+        vocab_mask[tokenizer.pad_token_id] = False
+    # print("Generation config used:", summary_output.generation_config)
     # summary_output = lm_backbone.bfloat16().cuda().generate(
     #     # input_ids=input_ids,
     #     input_ids=summary_inputs.input_ids,
@@ -1493,14 +1615,66 @@ def generate(
     # )
     # print("summary output", summary_output)
     summary_texts = []
+
+    
     for summary_ids in summary_output.sequences:
         summary = tokenizer.decode(
-            summary_ids[summary_inputs.input_ids.shape[1]:],
+            # summary_ids[summary_inputs.input_ids.shape[1]:],
+            summary_ids[summary_inputs['input_ids'].shape[1]:],
             skip_special_tokens = True
         ).strip()
         print("summary follsz:", summary)
         summary_texts.append(summary)
-    logits = torch.stack(summary_output.scores, 1)
+    processed_scores = []
+    for i, score in enumerate(summary_output.scores):
+        # Get logits
+        logits = torch.where(
+            torch.isinf(score) & (score < 0),
+            torch.tensor(-0.001, device=score.device, dtype=score.dtype),
+            score
+        )
+        # print(f"\nStep {i} Analysis:")
+        # print("Raw logits stats:")
+        # print(f"Contains -inf: {torch.isinf(logits).any().item()}")
+        # print(f"Min logit: {logits.min().item()}")
+        # print(f"Max logit: {logits.max().item()}")
+        
+        # Apply temperature
+        scaled_logits = logits
+        
+        # Create attention mask for valid tokens
+        vocab_mask = torch.ones_like(logits, dtype=torch.bool)
+        vocab_mask[:, tokenizer.pad_token_id] = False  # Mask pad token
+        
+        # Apply masked softmax
+        masked_logits = torch.where(
+            vocab_mask,
+            scaled_logits,
+            torch.tensor(-1e4, device=logits.device, dtype=logits.dtype)
+        )
+        probs = torch.softmax(masked_logits, dim=-1)
+        
+        # Compute log probabilities
+        log_probs = torch.log(probs + 1e-10)  # Add small epsilon to prevent -inf
+        
+        processed_scores.append(log_probs)
+
+    logits = torch.stack(processed_scores, 1)
+    # for score in summary_output.scores:
+    #     # Expand mask to match score shape
+    #     expanded_mask = vocab_mask.expand_as(score)
+    #     # Replace -inf with large negative number where vocab mask is False
+    #     # masked_score = torch.where(
+    #     #     torch.isinf(score) & (score < 0),  # Find -inf values
+    #     #     torch.tensor(-1e4, device=score.device, dtype=score.dtype),
+    #     #     score
+    #     # )
+    #     non_inf_values = score[~torch.isinf(score)]
+    #     # processed_scores.append(masked_score)
+    #     processed_scores.append(non_inf_values)
+    # logits = torch.stack(processed_scores, 1)
+    # logits = torch.stack(summary_output.scores, 1)
+    torch.cuda.empty_cache()
     return torch.cat((queries, summary_output.sequences[:, context_length:]), dim=1), logits
 
 
