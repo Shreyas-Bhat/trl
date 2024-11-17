@@ -1224,10 +1224,11 @@ def get_reward(
     # Convert tensor to text for LLM processing
     texts = []
     for i in range(query_responses.shape[0]):
-        valid_tokens = query_responses[i][attention_mask[i]][context_length:]
+        valid_tokens = query_responses[i][context_length:]
+        # [attention_mask[i]]
         if tokenizer:
             text = tokenizer.decode(valid_tokens)
-            prompt = f"Respond only in English: What sentiment does this {text} convey? Strictly answer if it is positive or negative and nothing else. You have no other option other than answering the question."
+            prompt = f"What sentiment does this {text} convey? Strictly answer if it is positive or negative and nothing else."
             texts.append(prompt)
             print("texts", texts)
     # tokenizer.add_special_tokens({'pad_token': '[PAD]'})
@@ -1260,7 +1261,7 @@ def get_reward(
             pad_token_id=tokenizer.pad_token_id,
             top_k = 50,
             top_p = 0.9,
-            temperature = 0.7, 
+            temperature = 0.4, 
             eos_token_id=tokenizer.eos_token_id,
             return_dict_in_generate=True,
             suppress_tokens=[tokenizer.eos_token_id],
@@ -1523,7 +1524,7 @@ def generate(
     # print("Checking device:", input_ids.device, attention_mask.device)
     # print("input_ids", input_ids)
     original_texts = []
-    tokenizer = AutoTokenizer.from_pretrained("TinyLlama/TinyLlama-1.1B-Chat-v1.0")
+    tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.2-1B")
     tokenizer.padding_side = "left"
     # tokenizer.add_special_tokens({'pad_token': '[PAD]'})\
     tokenizer.pad_token = tokenizer.eos_token
@@ -1582,7 +1583,7 @@ def generate(
     # )
     generation_config = GenerationConfig(
         max_new_tokens=200,
-        temperature=0.7,
+        temperature=0.4,
         do_sample=True,
         top_k=50,
         top_p=0.9,
