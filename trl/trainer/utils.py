@@ -1228,7 +1228,7 @@ def get_reward(
         # [attention_mask[i]]
         if tokenizer:
             text = tokenizer.decode(valid_tokens)
-            prompt = f"What sentiment does this {text} convey? Strictly answer if it is positive or negative and nothing else."
+            prompt = f"What sentiment does this {text} convey? Strictly answer in one word if it is positive or negative."
             texts.append(prompt)
             print("texts", texts)
     # tokenizer.add_special_tokens({'pad_token': '[PAD]'})
