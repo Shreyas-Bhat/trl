@@ -265,7 +265,7 @@ class RLOOTrainer(Trainer):
         #     # top_p=0.9,
         #     do_sample=True, #change
         # )
-        tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.1-8B")
+        tokenizer = AutoTokenizer.from_pretrained("google/gemma-2-9b")
         generation_config =  GenerationConfig(
             temperature=0.1,  # Try with temperature 1.0 first
             top_k=50,
@@ -383,7 +383,7 @@ class RLOOTrainer(Trainer):
 
                     # Response Processing 2. run reward model on the truncated responses
                     postprocessed_query_response = torch.cat((query, postprocessed_response), 1)
-                    tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.1-8B")
+                    tokenizer = AutoTokenizer.from_pretrained("google/gemma-2-9b")
                     tokenizer.padding_side = "left"
                     # Decode and print the components separately
                     if i%10==0:
@@ -413,7 +413,7 @@ class RLOOTrainer(Trainer):
                     llm_scores = llm_output
                     # print(f"The following are the llm_scores: {llm_scores}")
                     _, score, _ = get_reward(
-                        self.llm_decision_maker, postprocessed_query_response, processing_class.pad_token_id, context_length, llm_scores=llm_scores, ground_truth=ground_truth_batch, tokenizer=AutoTokenizer.from_pretrained("meta-llama/Llama-3.1-8B")
+                        self.llm_decision_maker, postprocessed_query_response, processing_class.pad_token_id, context_length, llm_scores=llm_scores, ground_truth=ground_truth_batch, tokenizer=AutoTokenizer.from_pretrained("google/gemma-2-9b")
                     ) #TODO: changing this line 
                     # _, score, _ = get_reward(
                     #     reward_model, postprocessed_response, processing_class.pad_token_id, context_length, llm_scores=llm_scores, ground_truth=ground_truth_batch, tokenizer=AutoTokenizer.from_pretrained("Qwen/Qwen2-0.5B")
@@ -908,7 +908,7 @@ class RLOOTrainer(Trainer):
                         context_length,
                         llm_scores=llm_scores,
                         ground_truth=ground_truth,
-                        tokenizer=AutoTokenizer.from_pretrained("meta-llama/Llama-3.1-8B")
+                        tokenizer=AutoTokenizer.from_pretrained("google/gemma-2-9b")
                     )
                     
                     score_np = score.view(-1).float().cpu().numpy()
