@@ -1225,19 +1225,20 @@ def get_reward(
     texts = []
     summary_prompts = []
     for i in range(query_responses.shape[0]):
-        valid_tokens = query_responses[i][context_length:]
+        # valid_tokens = query_responses[i][context_length:]
+        valid_tokens = query_responses[i]
+
         # [attention_mask[i]]
         if tokenizer:
             text = tokenizer.decode(valid_tokens)
-            system_message = """[INST] <<SYS>>
+            system_message = """
             You are an expert sentiment analyst. Your task is to:
             1. Read the provided text
             2. Classify it as either positive or negative
             3. Reply ONLY with the word 'Positive' or 'Negative'
-            <</SYS>>
             """
                 
-            prompt = f"{system_message}Text: {text}\nClassification:[/INST]"
+            prompt = f"{system_message}Text: {text}\nClassification:"
             summary_prompts.append(prompt)
             texts.append(prompt)
             print("texts", texts)
@@ -1271,7 +1272,7 @@ def get_reward(
             pad_token_id=tokenizer.pad_token_id,
             top_k = 50,
             top_p = 0.9,
-            temperature = 0.4, 
+            temperature = 0.1, 
             eos_token_id=tokenizer.eos_token_id,
             return_dict_in_generate=True,
             suppress_tokens=[tokenizer.eos_token_id],
@@ -1596,7 +1597,7 @@ def generate(
     # )
     generation_config = GenerationConfig(
         max_new_tokens=200,
-        temperature=0.4,
+        temperature=0.1,
         do_sample=True,
         top_k=50,
         top_p=0.9,

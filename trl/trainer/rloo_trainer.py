@@ -267,7 +267,7 @@ class RLOOTrainer(Trainer):
         # )
         tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.1-8B")
         generation_config =  GenerationConfig(
-            temperature=0.4,  # Try with temperature 1.0 first
+            temperature=0.1,  # Try with temperature 1.0 first
             top_k=50,
             do_sample=True,
             top_p=0.9,
@@ -842,7 +842,7 @@ class RLOOTrainer(Trainer):
             max_new_tokens=100,
             do_sample=True, #change
             num_beams=1,
-            temperature=0.4,
+            temperature=0.1,
             top_k=50,
             top_p=0.9,
             pad_token_id=processing_class.pad_token_id,
