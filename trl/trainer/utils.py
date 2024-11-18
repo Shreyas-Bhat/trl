@@ -1292,79 +1292,79 @@ def get_reward(
         #     print("-" * 50)
         
         # Convert responses to binary probabilities
-        # llm_probabilities = torch.zeros(ground_truth.shape[0]).to(device)
-        # for i, text in enumerate(generated_texts):
-        #     text = text.lower().strip()
-        #     # print("text", text)
-        #     # You might need to adjust this based on actual outputs
-        #     if 'positive' in text:
-        #         llm_probabilities[i] = 0.80
-        #     elif 'negative' in text:
-        #         llm_probabilities[i] = 0.20
-        positive_id = tokenizer.encode(' positive', add_special_tokens=False)[0]
-        negative_id = tokenizer.encode(' negative', add_special_tokens=False)[0]
-
-        # Initialize probabilities tensor
-        llm_probabilities = torch.zeros(len(generated_texts)).to(device)
-
+        llm_probabilities = torch.zeros(ground_truth.shape[0]).to(device)
         for i, text in enumerate(generated_texts):
             text = text.lower().strip()
-            print(f"\nText {i}: {text}")
-            # Find the position of "positive" or "negative" in the generated text
-            token_ids = tokenizer.encode(text, add_special_tokens=False)
-            tokens = tokenizer.convert_ids_to_tokens(token_ids)
-            print("Token IDs:", token_ids)
-            print("Tokens:", tokens)
-            # pos_tokens = tokenizer.encode('positive', add_special_tokens=False)
-            # neg_tokens = tokenizer.encode('negative', add_special_tokens=False)
-            # print("'positive' token ids:", pos_tokens)
-            # print("'negative' token ids:", neg_tokens)
-            # print("'positive' tokens:", tokenizer.convert_ids_to_tokens(pos_tokens))
-            # print("'negative' tokens:", tokenizer.convert_ids_to_tokens(neg_tokens))
-            pos_variants = [
-                tokenizer.encode('positive', add_special_tokens=False)[0],
-                tokenizer.encode(' positive', add_special_tokens=False)[0],
-                tokenizer.encode('Positive', add_special_tokens=False)[0],
-                tokenizer.encode(' Positive', add_special_tokens=False)[0]
-            ]
-            neg_variants = [
-                tokenizer.encode('negative', add_special_tokens=False)[0],
-                tokenizer.encode(' negative', add_special_tokens=False)[0],
-                tokenizer.encode('Negative', add_special_tokens=False)[0],
-                tokenizer.encode(' Negative', add_special_tokens=False)[0]
-            ]
+            # print("text", text)
+            # You might need to adjust this based on actual outputs
+            if 'positive' in text:
+                llm_probabilities[i] = 0.80
+            elif 'negative' in text:
+                llm_probabilities[i] = 0.20
+        # positive_id = tokenizer.encode(' positive', add_special_tokens=False)[0]
+        # negative_id = tokenizer.encode(' negative', add_special_tokens=False)[0]
 
-            # Remove duplicates and print for debugging
-            pos_variants = list(set(pos_variants))
-            neg_variants = list(set(neg_variants))
-            print("Positive token variants:", pos_variants)
-            print("Negative token variants:", neg_variants)
+        # # Initialize probabilities tensor
+        # llm_probabilities = torch.zeros(len(generated_texts)).to(device)
 
-            llm_probabilities = torch.zeros(len(generated_texts)).to(device)
+        # for i, text in enumerate(generated_texts):
+        #     text = text.lower().strip()
+        #     print(f"\nText {i}: {text}")
+        #     # Find the position of "positive" or "negative" in the generated text
+        #     token_ids = tokenizer.encode(text, add_special_tokens=False)
+        #     tokens = tokenizer.convert_ids_to_tokens(token_ids)
+        #     print("Token IDs:", token_ids)
+        #     print("Tokens:", tokens)
+        #     # pos_tokens = tokenizer.encode('positive', add_special_tokens=False)
+        #     # neg_tokens = tokenizer.encode('negative', add_special_tokens=False)
+        #     # print("'positive' token ids:", pos_tokens)
+        #     # print("'negative' token ids:", neg_tokens)
+        #     # print("'positive' tokens:", tokenizer.convert_ids_to_tokens(pos_tokens))
+        #     # print("'negative' tokens:", tokenizer.convert_ids_to_tokens(neg_tokens))
+        #     pos_variants = [
+        #         tokenizer.encode('positive', add_special_tokens=False)[0],
+        #         tokenizer.encode(' positive', add_special_tokens=False)[0],
+        #         tokenizer.encode('Positive', add_special_tokens=False)[0],
+        #         tokenizer.encode(' Positive', add_special_tokens=False)[0]
+        #     ]
+        #     neg_variants = [
+        #         tokenizer.encode('negative', add_special_tokens=False)[0],
+        #         tokenizer.encode(' negative', add_special_tokens=False)[0],
+        #         tokenizer.encode('Negative', add_special_tokens=False)[0],
+        #         tokenizer.encode(' Negative', add_special_tokens=False)[0]
+        #     ]
 
-            for i, text in enumerate(generated_texts):
-                text = text.lower().strip()
-                token_ids = tokenizer.encode(text, add_special_tokens=False)
+        #     # Remove duplicates and print for debugging
+        #     pos_variants = list(set(pos_variants))
+        #     neg_variants = list(set(neg_variants))
+        #     print("Positive token variants:", pos_variants)
+        #     print("Negative token variants:", neg_variants)
+
+        #     llm_probabilities = torch.zeros(len(generated_texts)).to(device)
+
+        #     for i, text in enumerate(generated_texts):
+        #         text = text.lower().strip()
+        #         token_ids = tokenizer.encode(text, add_special_tokens=False)
                 
-                # Check for any variant of positive
-                pos_positions = [i for i, t in enumerate(token_ids) if t in pos_variants]
-                if pos_positions:
-                    pos = pos_positions[0]  # Take first occurrence
-                    logits = generated_outputs.scores[pos]
-                    probs = torch.softmax(logits[i], dim=-1)
-                    # Sum probabilities for all positive variants
-                    prob = sum(probs[token_id].item() for token_id in pos_variants)
-                    llm_probabilities[i] = prob
+        #         # Check for any variant of positive
+        #         pos_positions = [i for i, t in enumerate(token_ids) if t in pos_variants]
+        #         if pos_positions:
+        #             pos = pos_positions[0]  # Take first occurrence
+        #             logits = generated_outputs.scores[pos]
+        #             probs = torch.softmax(logits[i], dim=-1)
+        #             # Sum probabilities for all positive variants
+        #             prob = sum(probs[token_id].item() for token_id in pos_variants)
+        #             llm_probabilities[i] = prob
                 
-                # Check for any variant of negative
-                neg_positions = [i for i, t in enumerate(token_ids) if t in neg_variants]
-                if neg_positions:
-                    pos = neg_positions[0]
-                    logits = generated_outputs.scores[pos]
-                    probs = torch.softmax(logits[i], dim=-1)
-                    # Sum probabilities for all negative variants
-                    prob = sum(probs[token_id].item() for token_id in neg_variants)
-                    llm_probabilities[i] = -prob 
+        #         # Check for any variant of negative
+        #         neg_positions = [i for i, t in enumerate(token_ids) if t in neg_variants]
+        #         if neg_positions:
+        #             pos = neg_positions[0]
+        #             logits = generated_outputs.scores[pos]
+        #             probs = torch.softmax(logits[i], dim=-1)
+        #             # Sum probabilities for all negative variants
+        #             prob = sum(probs[token_id].item() for token_id in neg_variants)
+        #             llm_probabilities[i] = -prob 
 
         # Reshape and calculate CE
         llm_probabilities = llm_probabilities.view(-1, 1)
