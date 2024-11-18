@@ -1223,12 +1223,22 @@ def get_reward(
     tokenizer.pad_token = tokenizer.eos_token
     # Convert tensor to text for LLM processing
     texts = []
+    summary_prompts = []
     for i in range(query_responses.shape[0]):
         valid_tokens = query_responses[i][context_length:]
         # [attention_mask[i]]
         if tokenizer:
             text = tokenizer.decode(valid_tokens)
-            prompt = f"What sentiment does this {text} convey? Strictly answer in one word if it is positive or negative."
+            system_message = """[INST] <<SYS>>
+            You are an expert sentiment analyst. Your task is to:
+            1. Read the provided text
+            2. Classify it as either positive or negative
+            3. Reply ONLY with the word 'Positive' or 'Negative'
+            <</SYS>>
+            """
+                
+            prompt = f"{system_message}Text: {text}\nClassification:[/INST]"
+            summary_prompts.append(prompt)
             texts.append(prompt)
             print("texts", texts)
     # tokenizer.add_special_tokens({'pad_token': '[PAD]'})
@@ -1524,7 +1534,7 @@ def generate(
     # print("Checking device:", input_ids.device, attention_mask.device)
     # print("input_ids", input_ids)
     original_texts = []
-    tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.1-8B")
+    tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.2-1B")
     tokenizer.padding_side = "left"
     # tokenizer.add_special_tokens({'pad_token': '[PAD]'})\
     tokenizer.pad_token = tokenizer.eos_token
@@ -1536,8 +1546,11 @@ def generate(
         original_texts.append(text)
     summary_prompts = []
     for text in original_texts:
-        prompt=f"Please provide a brief summary of the following text:\n\n{text}\n\nSummary:"
+        system_message = "[INST] <<SYS>>\nYou are an expert sentiment analyst skilled in determining whether text is positive or negative. Reply only with 'Positive' or 'Negative'.\n<</SYS>>\n"
+        
+        prompt = f"{system_message}Here is the text to analyze:\n\n{text}\n\nSentiment:[/INST]"
         summary_prompts.append(prompt)
+        # summary_prompts.append(prompt)
     print("summary prompts", summary_prompts)
     # breakpoint()
     summary_inputs = tokenizer(
