@@ -50,4 +50,4 @@ class RLOOConfig(OnPolicyConfig):
     whiten_rewards: bool = False
     kl_coef: float = 0.05
     cliprange: float = 0.2
-    rloo_k: int = 4
+    rloo_k: int = 2
