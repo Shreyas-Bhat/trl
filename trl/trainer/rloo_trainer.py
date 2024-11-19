@@ -21,7 +21,6 @@ import textwrap
 import time
 from collections import defaultdict
 from typing import Dict, List, Optional, Tuple, Union
-
 import numpy as np
 import pandas as pd
 import torch
@@ -265,7 +264,7 @@ class RLOOTrainer(Trainer):
         #     # top_p=0.9,
         #     do_sample=True, #change
         # )
-        tokenizer = AutoTokenizer.from_pretrained("google/gemma-2-9b")
+        tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.2-1B")
         generation_config =  GenerationConfig(
             temperature=0.1,  # Try with temperature 1.0 first
             top_k=50,
@@ -383,21 +382,21 @@ class RLOOTrainer(Trainer):
 
                     # Response Processing 2. run reward model on the truncated responses
                     postprocessed_query_response = torch.cat((query, postprocessed_response), 1)
-                    tokenizer = AutoTokenizer.from_pretrained("google/gemma-2-9b")
+                    tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.2-1B")
                     tokenizer.padding_side = "left"
                     # Decode and print the components separately
                     if i%10==0:
-                        print("\n=== Query-Response Components ===")
-                        print("1. Original Query:")
-                        print("postprocessed_query_response", postprocessed_query_response)
+                        # print("\n=== Query-Response Components ===")
+                        # print("1. Original Query:")
+                        # print("postprocessed_query_response", postprocessed_query_response)
                         query_text = tokenizer.batch_decode(query, skip_special_tokens=True)
-                        for i, q in enumerate(query_text):
-                            print(f"Query {i+1}: {q}")
+                        # for i, q in enumerate(query_text):
+                        #     print(f"Query {i+1}: {q}")
 
-                        print("\n2. Processed Response:")
+                        # print("\n2. Processed Response:")
                         response_text = tokenizer.batch_decode(postprocessed_response, skip_special_tokens=True)
-                        for i, r in enumerate(response_text):
-                            print(f"Response {i+1}: {r}")
+                        # for i, r in enumerate(response_text):
+                        #     print(f"Response {i+1}: {r}")
 
                         # print("\n3. Full Concatenated Query-Response:")
                         # full_text = tokenizer.batch_decode(postprocessed_query_response, skip_special_tokens=True)
@@ -413,7 +412,7 @@ class RLOOTrainer(Trainer):
                     llm_scores = llm_output
                     # print(f"The following are the llm_scores: {llm_scores}")
                     _, score, _ = get_reward(
-                        self.llm_decision_maker, postprocessed_query_response, processing_class.pad_token_id, context_length, llm_scores=llm_scores, ground_truth=ground_truth_batch, tokenizer=AutoTokenizer.from_pretrained("google/gemma-2-9b")
+                        self.llm_decision_maker, postprocessed_query_response, processing_class.pad_token_id, context_length, llm_scores=llm_scores, ground_truth=ground_truth_batch, tokenizer=AutoTokenizer.from_pretrained("meta-llama/Llama-3.2-1B")
                     ) #TODO: changing this line 
                     # _, score, _ = get_reward(
                     #     reward_model, postprocessed_response, processing_class.pad_token_id, context_length, llm_scores=llm_scores, ground_truth=ground_truth_batch, tokenizer=AutoTokenizer.from_pretrained("Qwen/Qwen2-0.5B")
@@ -908,7 +907,7 @@ class RLOOTrainer(Trainer):
                         context_length,
                         llm_scores=llm_scores,
                         ground_truth=ground_truth,
-                        tokenizer=AutoTokenizer.from_pretrained("google/gemma-2-9b")
+                        tokenizer=AutoTokenizer.from_pretrained("meta-llama/Llama-3.2-1B")
                     )
                     
                     score_np = score.view(-1).float().cpu().numpy()

@@ -14,6 +14,8 @@
 import os
 # os.environ['CUDA_DEVICE_ORDER']='PCI_BUS_ID'
 # os.environ['CUDA_LAUNCH_BLOCKING'] = '0'
+# os.environ['OPENAI_API_KEY'] = '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'
+
 import dataclasses
 import importlib.resources as pkg_resources
 import json
@@ -23,7 +25,7 @@ from collections import deque
 from dataclasses import dataclass
 from importlib.metadata import version
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
-
+from openai import OpenAI
 import numpy as np
 import pandas as pd
 import torch
@@ -853,8 +855,8 @@ def peft_module_casting_to_bf16(model):
         elif any(x in name for x in ["lm_head", "embed_tokens", "wte", "wpe"]):
             if hasattr(module, "weight"):
                 if module.weight.dtype == torch.float32:
-                    module = module.to(torch.bfloat16)
-                    # module = module.to(torch.bfloat8)
+                    # module = module.to(torch.bfloat16)
+                    module = module.to(torch.bfloat8)
 
 
 def trl_sanitze_kwargs_for_tagging(model, tag_names, kwargs=None):
@@ -1074,134 +1076,6 @@ def first_true_indices(bools: torch.Tensor, dtype=torch.long):
     zero_or_index = row_len * (~bools).type(dtype) + torch.arange(row_len, dtype=dtype, device=device)
     return torch.min(zero_or_index, dim=-1).values
 
-
-# def get_reward(
-#     model: torch.nn.Module, query_responses: torch.Tensor, pad_token_id: int, context_length: int, llm_scores: torch.Tensor, ground_truth: torch.Tensor
-# ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-#     """
-#     Computes the reward logits and the rewards for a given model and query responses.
-
-#     Args:
-#         model (`torch.nn.Module`):
-#             The model used to compute the reward logits.
-#         query_responses (`torch.Tensor`):
-#             The tensor containing the query responses.
-#         pad_token_id (`int`):
-#             The token ID representing the pad token.
-#         context_length (`int`):
-#             The length of the context in the query responses.
-#         llm_scores (`torch.Tensor`):
-#             Scores/logits from the LLM decision maker.
-#         ground_truth (`torch.Tensor`):
-#             The ground truth sentiment labels to compute cross entropy against.
-
-#     Returns:
-#         tuple:
-#             - `reward_logits` (`torch.Tensor`):
-#                 The logits for the reward model.
-#             - `final_rewards` (`torch.Tensor`):
-#                 The final rewards for each query response.
-#             - `sequence_lengths` (`torch.Tensor`):
-#                 The lengths of the sequences in the query responses.
-#     """
-#     attention_mask = query_responses != pad_token_id
-#     position_ids = attention_mask.cumsum(1) - attention_mask.long()  # exclusive cumsum
-#     lm_backbone = getattr(model, model.base_model_prefix)
-#     input_ids = torch.masked_fill(query_responses, ~attention_mask, 0)
-#     # output = lm_backbone(
-#     #     input_ids=input_ids,
-#     #     attention_mask=attention_mask,
-#     #     position_ids=position_ids,
-#     #     return_dict=True,
-#     #     output_hidden_states=True,
-#     #     use_cache=False,  # otherwise mistral-based RM would error out
-#     # ) TODO: commented out because didnt make sense
-
-#     output = lm_backbone()
-#     print("output", output)
-#     # reward_logits = model.score(output.hidden_states[-1])
-#     reward_logits = 0.5 #TODO: change to actual score
-#     sequence_lengths = first_true_indices(query_responses[:, context_length:] == pad_token_id) - 1 + context_length
-#     # https://github.com/huggingface/transformers/blob/dc68a39c8111217683bf49a4912d0c9018bab33d/src/transformers/models/gpt2/modeling_gpt2.py#L1454
-#     # llm_probabilities = llm_scores
-#     print("ground_truth shape:", ground_truth.shape)
-#     print("query_response shape:", query_responses.shape)
-#     llm_probabilities = torch.zeros(ground_truth.shape[0]).to(ground_truth.device) #TODO: change to actual score
-#     llm_probabilities.fill_(0.5)
-#     print("llm_probabilities shape:", llm_probabilities.shape)
-#     cross_entropy = -torch.sum(ground_truth * torch.log(llm_probabilities + 1e-10), dim=-1)
-#     return (
-#         reward_logits,
-#         cross_entropy,
-#         sequence_lengths,
-#     )
-# def get_reward(
-#     model: torch.nn.Module, query_responses: torch.Tensor, pad_token_id: int, context_length: int, llm_scores: torch.Tensor, ground_truth: torch.Tensor, tokenizer=None
-# ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-#     """
-#     Computes the reward using LLM sentiment classification.
-#     Returns 0.95 for positive sentiment, 0.05 for negative sentiment.
-#     """
-#     attention_mask = query_responses != pad_token_id
-#     sequence_lengths = first_true_indices(query_responses[:, context_length:] == pad_token_id) - 1 + context_length
-    
-#     # Convert tensor to text for LLM processing
-#     texts = []
-#     for i in range(query_responses.shape[0]):
-#         # Only take non-pad tokens
-#         valid_tokens = query_responses[i][attention_mask[i]]
-#         if tokenizer:
-#             text = tokenizer.decode(valid_tokens)
-#             prompt = f"Is this text positive or negative? Answer with only 'positive' or 'negative': {text}"
-#             texts.append(prompt)
-            
-#     # Generate responses from model
-#     device = next(model.parameters()).device
-#     # print("texts",texts)
-#     inputs = tokenizer(texts, return_tensors="pt", padding=True, truncation=True).to(device)
-    
-#     with torch.no_grad():
-#         # print("inputs", **inputs)
-#         outputs = model(**inputs)
-#         # print("outputs", outputs.logits.shape)
-#         # Get the logits for the next token prediction
-#         logits = outputs.logits[:, -1, :]
-        
-#         # Get probabilities using softmax
-#         probs = torch.nn.functional.softmax(logits, dim=-1)
-        
-#         # Find the tokens for 'positive' and 'negative'
-#         positive_token = tokenizer.encode(' positive', add_special_tokens=False)[0]
-#         negative_token = tokenizer.encode(' negative', add_special_tokens=False)[0]
-        
-#         # Get probabilities for positive/negative
-#         positive_probs = probs[:, positive_token]
-#         negative_probs = probs[:, negative_token]
-        
-#         # Convert to binary probabilities
-#         llm_probabilities = torch.zeros(ground_truth.shape[0]).to(device)
-#         for i in range(len(positive_probs)):
-#             if positive_probs[i] > negative_probs[i]:
-#                 llm_probabilities[i] = 0.80
-#             else:
-#                 llm_probabilities[i] = 0.15
-    
-#     # Compute cross entropy loss
-#     # print("Ground truth, llm_probabilities", ground_truth.shape, llm_probabilities.shape)
-#     ground_truth = ground_truth.float().view(-1,1)
-#     llm_probabilities = llm_probabilities.float().view(-1,1)
-#     epsilon = 1e-7
-#     # cross_entropy = -torch.sum(ground_truth * torch.log(llm_probabilities), dim=-1)
-#     cross_entropy = -ground_truth * torch.log(llm_probabilities + epsilon) - (1 - ground_truth) * torch.log(1 - llm_probabilities + epsilon)
-    
-#     print("cross_entropy", cross_entropy, cross_entropy.shape)
-    
-#     return (
-#         llm_probabilities,  # reward_logits
-#         cross_entropy,
-#         sequence_lengths,
-#     )
-
 def get_reward(
     model: torch.nn.Module, 
     query_responses: torch.Tensor, 
@@ -1223,7 +1097,9 @@ def get_reward(
     tokenizer.pad_token = tokenizer.eos_token
     # Convert tensor to text for LLM processing
     texts = []
+    # client = OpenAI()
     summary_prompts = []
+    generated_texts = []
     for i in range(query_responses.shape[0]):
         # valid_tokens = query_responses[i][context_length:]
         valid_tokens = query_responses[i]
@@ -1238,16 +1114,41 @@ def get_reward(
             3. Reply ONLY with the word 'Positive' or 'Negative'
             """
                 
-            prompt = f"{system_message}Text: {text}\nClassification:"
+            prompt = f"{system_message}. This is an example of a movie review with its sentiment prediction: Its not the cast. A finer group of actors, you could not find. Its not the setting... Sentiment: Negative. Follow this same template when generating outputs and here is the text to analyze:\n\n{text}\n\nSentiment:"
+
             summary_prompts.append(prompt)
             texts.append(prompt)
-            print("texts", texts)
-    # tokenizer.add_special_tokens({'pad_token': '[PAD]'})
+    # for i in range(query_responses.shape[0]):
+    #     valid_tokens = query_responses[i]
+        
+        # if tokenizer:
+        #     text = tokenizer.decode(valid_tokens)
+            
+        #     # Prepare messages for OpenAI API
+        #     messages = [
+        #         {
+        #             "role": "system",
+        #             "content": """You are an expert sentiment analyst. Your task is to:
+        #             1. Read the provided text
+        #             2. Classify it as either positive or negative
+        #             3. Reply ONLY with the word 'Positive' or 'Negative'"""
+        #         },
+        #         {
+        #             "role": "user",
+        #             "content": f"Text: {text}\nClassification:"
+        #         }
+        #     ]
+            
+        #     # Store both original text and formatted messages
+        #     texts.append(text)  # Store original decoded text
+        #     summary_prompts.append(messages)
+    #         print("texts", texts)
+    # # tokenizer.add_special_tokens({'pad_token': '[PAD]'})
     
-    # tokenizer.padding_side = 'left'
-    # device = next(model.parameters()).device
+    # # tokenizer.padding_side = 'left'
+    # # device = next(model.parameters()).device
     inputs = tokenizer(texts, return_tensors="pt", padding=True, truncation=True).to(device)
-    model.eval()
+    # model.eval()
     with torch.no_grad():
         # Generate complete responses
         # generated_outputs = model.bfloat16().generate(
@@ -1261,11 +1162,12 @@ def get_reward(
         #     return_dict_in_generate=True,
         #     output_scores=True  # Get the scores for each token
         # )
+        
         generated_outputs = model.generate(
             **inputs,
             remove_invalid_values=True,
             # inputs["input_ids"],
-            max_new_tokens=200,  # Adjust based on expected response length
+            max_new_tokens=5,  # Adjust based on expected response length
             min_length = 2,
             num_beams=1,       # Use greedy decoding
             do_sample=True,   # Don't use sampling
@@ -1291,22 +1193,53 @@ def get_reward(
         #     print(f"Input {idx}: {prompt}")
         #     print(f"Output: {response}")
         #     print("-" * 50)
+    # for text in texts:
+    #     system_message = {
+    #         "role": "system",
+    #         "content": """You are an expert sentiment analyst. Your task is to:
+    #         1. Read the provided text
+    #         2. Classify it as either positive or negative
+    #         3. Reply ONLY with the word 'Positive' or 'Negative'"""
+    #     }
         
-        # Convert responses to binary probabilities
-        llm_probabilities = torch.zeros(ground_truth.shape[0]).to(device)
-        for i, text in enumerate(generated_texts):
-            text = text.lower().strip()
-            # print("text", text)
-            # You might need to adjust this based on actual outputs
-            if 'positive' in text:
-                llm_probabilities[i] = 0.80
-            elif 'negative' in text:
-                llm_probabilities[i] = 0.20
+    #     user_message = {
+    #         "role": "user",
+    #         "content": f"Text: {text}\nClassification:"
+    #     }
+        
+    #     summary_prompts.append([system_message, user_message])
+
+    # # Process each prompt with API
+    # for messages in summary_prompts:
+        
+    #     completion = client.chat.completions.create(
+    #         model="gpt-4o-mini",  # or your preferred model
+    #         messages=messages,
+    #         temperature=0.1,
+    #         max_tokens=200,
+    #         top_p=0.9,
+    #         frequency_penalty=0,
+    #         presence_penalty=0
+    #     )
+            
+    #         # Extract response
+    #     response = completion.choices[0].message.content
+    #     generated_texts.append(response.strip())
+    #     # Convert responses to binary probabilities
+    # llm_probabilities = torch.zeros(ground_truth.shape[0]).to(device)
+    # for i, text in enumerate(generated_texts):
+    #     # text = text.lower().strip()
+    #     print("Prediction output: \n", text)
+    #     # You might need to adjust this based on actual outputs
+    #     if 'Output: Negative' in text:
+    #         llm_probabilities[i] = 0.20
+    #     elif 'Output: Positive' in text:
+    #         llm_probabilities[i] = 0.80
         # positive_id = tokenizer.encode(' positive', add_special_tokens=False)[0]
         # negative_id = tokenizer.encode(' negative', add_special_tokens=False)[0]
 
         # # Initialize probabilities tensor
-        # llm_probabilities = torch.zeros(len(generated_texts)).to(device)
+        llm_probabilities = torch.zeros(len(generated_texts)).to(device)
 
         # for i, text in enumerate(generated_texts):
         #     text = text.lower().strip()
@@ -1322,60 +1255,107 @@ def get_reward(
         #     # print("'negative' token ids:", neg_tokens)
         #     # print("'positive' tokens:", tokenizer.convert_ids_to_tokens(pos_tokens))
         #     # print("'negative' tokens:", tokenizer.convert_ids_to_tokens(neg_tokens))
-        #     pos_variants = [
-        #         tokenizer.encode('positive', add_special_tokens=False)[0],
-        #         tokenizer.encode(' positive', add_special_tokens=False)[0],
-        #         tokenizer.encode('Positive', add_special_tokens=False)[0],
-        #         tokenizer.encode(' Positive', add_special_tokens=False)[0]
-        #     ]
-        #     neg_variants = [
-        #         tokenizer.encode('negative', add_special_tokens=False)[0],
-        #         tokenizer.encode(' negative', add_special_tokens=False)[0],
-        #         tokenizer.encode('Negative', add_special_tokens=False)[0],
-        #         tokenizer.encode(' Negative', add_special_tokens=False)[0]
-        #     ]
+        pos_variants = [
+            tokenizer.encode('positive', add_special_tokens=False)[0],
+            tokenizer.encode(' positive', add_special_tokens=False)[0],
+            tokenizer.encode('Positive', add_special_tokens=False)[0],
+            tokenizer.encode(' Positive', add_special_tokens=False)[0]
+        ]
+        neg_variants = [
+            tokenizer.encode('negative', add_special_tokens=False)[0],
+            tokenizer.encode(' negative', add_special_tokens=False)[0],
+            tokenizer.encode('Negative', add_special_tokens=False)[0],
+            tokenizer.encode(' Negative', add_special_tokens=False)[0]
+        ]
 
-        #     # Remove duplicates and print for debugging
-        #     pos_variants = list(set(pos_variants))
-        #     neg_variants = list(set(neg_variants))
-        #     print("Positive token variants:", pos_variants)
-        #     print("Negative token variants:", neg_variants)
+            # # Remove duplicates and print for debugging
+            # pos_variants = list(set(pos_variants))
+            # neg_variants = list(set(neg_variants))
+            # print("Positive token variants:", pos_variants)
+            # print("Negative token variants:", neg_variants)
 
-        #     llm_probabilities = torch.zeros(len(generated_texts)).to(device)
+            # llm_probabilities = torch.zeros(len(generated_texts)).to(device)
 
-        #     for i, text in enumerate(generated_texts):
-        #         text = text.lower().strip()
-        #         token_ids = tokenizer.encode(text, add_special_tokens=False)
+        for i, text in enumerate(generated_texts):
+            text = text.lower().strip()
+            print("text", text)
+            token_ids = tokenizer.encode(text, add_special_tokens=False)
+            print(token_ids, pos_variants)
+            # Check for any variant of positive
+            pos_positions = [i for i, t in enumerate(token_ids) if t in pos_variants]
+            if pos_positions:
+                pos = pos_positions[0]  # Take first occurrence
+                # Get logits for that position
+                logits = generated_outputs.scores[pos][i]
                 
-        #         # Check for any variant of positive
-        #         pos_positions = [i for i, t in enumerate(token_ids) if t in pos_variants]
-        #         if pos_positions:
-        #             pos = pos_positions[0]  # Take first occurrence
-        #             logits = generated_outputs.scores[pos]
-        #             probs = torch.softmax(logits[i], dim=-1)
-        #             # Sum probabilities for all positive variants
-        #             prob = sum(probs[token_id].item() for token_id in pos_variants)
-        #             llm_probabilities[i] = prob
+                # Apply softmax to convert logits to probabilities
+                probs = torch.softmax(logits, dim=-1)
                 
-        #         # Check for any variant of negative
-        #         neg_positions = [i for i, t in enumerate(token_ids) if t in neg_variants]
-        #         if neg_positions:
-        #             pos = neg_positions[0]
-        #             logits = generated_outputs.scores[pos]
-        #             probs = torch.softmax(logits[i], dim=-1)
-        #             # Sum probabilities for all negative variants
-        #             prob = sum(probs[token_id].item() for token_id in neg_variants)
-        #             llm_probabilities[i] = -prob 
+                # Get probabilities for positive variants
+                pos_probs = torch.tensor([probs[token_id] for token_id in pos_variants])
+                prob = torch.max(pos_probs)  # Get highest probability among positive tokens
+                llm_probabilities[i] = prob.item()
+            
+            # Check for any variant of negative
+            neg_positions = [i for i, t in enumerate(token_ids) if t in neg_variants]
+            if neg_positions:
+                pos = neg_positions[0]  # Take first occurrence
+                # Get logits for that position
+                logits = generated_outputs.scores[pos][i]
+                
+                # Apply softmax to convert logits to probabilities
+                probs = torch.softmax(logits, dim=-1)
+                
+                # Get probabilities for positive variants
+                pos_probs = torch.tensor([probs[token_id] for token_id in neg_variants])
+                prob = torch.max(pos_probs)  # Get highest probability among positive tokens
+                llm_probabilities[i] = prob.item()
 
         # Reshape and calculate CE
-        llm_probabilities = llm_probabilities.view(-1, 1)
-        ground_truth = ground_truth.float().view(-1, 1)
+    # positive_words = {'good', 'great', 'excellent', 'amazing', 'love', 'awesome', 
+    #             'fantastic', 'wonderful', 'best', 'brilliant', 'enjoyed'}
+   
 
-        epsilon = 1e-7
-        cross_entropy = -ground_truth * torch.log(llm_probabilities.abs() + epsilon) - \
-                    (1 - ground_truth) * torch.log(1 - llm_probabilities.abs() + epsilon)
-    # cross_entropy = torch.tensor([0.0], device=device)
-    
+    # llm_probabilities = torch.zeros(len(generated_texts)).to(device) 
+    # # Integration with existing code:
+    # for i, text in enumerate(generated_texts):
+    #     words = text.lower().split()
+    #     pos_count = sum(1 for word in words if word in positive_words)
+        
+    #     # If has positive words, reward is 0.8, else 0.2
+    #     if pos_count > 0:
+    #         reward = 0.8
+    #     else:
+    #         reward = 0.2
+    #     llm_probabilities[i] = reward
+    llm_probabilities = llm_probabilities.view(-1, 1)
+    ground_truth = ground_truth.float().view(-1, 1)
+
+    epsilon = 1e-7
+    cross_entropy = -ground_truth * torch.log(llm_probabilities.abs() + epsilon) - \
+                (1 - ground_truth) * torch.log(1 - llm_probabilities.abs() + epsilon)
+    metrics_data = []
+    for i in range(len(generated_texts)):
+        token_ids = tokenizer.encode(generated_texts[i], add_special_tokens=False)
+        metrics_dict = {
+            'input_text': texts[i],
+            'model_output': generated_texts[i],
+            'LLM probabilites': llm_probabilities[i].item(),
+            'Ground Truth': ground_truth[i].item(),
+            'cross_entropy': cross_entropy[i].item() if cross_entropy.dim() > 0 else cross_entropy.item(),
+            'tokens': token_ids,
+            'pos variants': pos_variants,
+            'neg variants': neg_variants
+        }
+        metrics_data.append(metrics_dict)
+    df = pd.DataFrame(metrics_data)
+    filename = f'rewards.csv'
+    # If file exists, append without headers
+    if os.path.exists(filename):
+        df.to_csv(filename, mode='a', header=False, index=False)
+    else:
+        # If file doesn't exist, create new with headers
+        df.to_csv(filename, mode='w', header=True, index=False)
     print("\nMetrics:")
     print("Ground truth:", ground_truth)
     print("LLM probabilities:", llm_probabilities)
@@ -1535,7 +1515,7 @@ def generate(
     # print("Checking device:", input_ids.device, attention_mask.device)
     # print("input_ids", input_ids)
     original_texts = []
-    tokenizer = AutoTokenizer.from_pretrained("google/gemma-2-9b")
+    tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.2-1B")
     tokenizer.padding_side = "left"
     # tokenizer.add_special_tokens({'pad_token': '[PAD]'})\
     tokenizer.pad_token = tokenizer.eos_token
@@ -1547,12 +1527,12 @@ def generate(
         original_texts.append(text)
     summary_prompts = []
     for text in original_texts:
-        system_message = "[INST] <<SYS>>\nYou are an expert sentiment analyst skilled in determining whether text is positive or negative. Reply only with 'Positive' or 'Negative'.\n<</SYS>>\n"
+        system_message = "You are an expert sentiment analyst skilled in determining whether text is positive or negative. Reply only with 'Positive' or 'Negative'."
         
-        prompt = f"{system_message}Here is the text to analyze:\n\n{text}\n\nSentiment:[/INST]"
+        prompt = f"{system_message}. This is an example of a movie review with its sentiment prediction: Its not the cast. A finer group of actors, you could not find. Its not the setting... Sentiment: Negative. Follow this same template when generating outputs and here is the text to analyze:\n\n{text}\n\nSentiment:"
         summary_prompts.append(prompt)
         # summary_prompts.append(prompt)
-    print("summary prompts", summary_prompts)
+    # print("summary prompts", summary_prompts)
     # breakpoint()
     summary_inputs = tokenizer(
         summary_prompts,
@@ -1564,20 +1544,20 @@ def generate(
     
     # with torch.cuda.amp.autocast(True):[]
     # Check your inputs first
-    print("Input shape:", summary_inputs['input_ids'].shape)
-    print("Attention mask shape:", summary_inputs['attention_mask'].shape)
-    print("Sample of attention mask:", summary_inputs['attention_mask'][0][:50])
+    # print("Input shape:", summary_inputs['input_ids'].shape)
+    # print("Attention mask shape:", summary_inputs['attention_mask'].shape)
+    # print("Sample of attention mask:", summary_inputs['attention_mask'][0][:50])
 
     # Add checks for special tokens
-    print("First token:", summary_inputs['input_ids'][0][0])  # Should be BOS token if used
-    print("Sample sequence:", summary_inputs['input_ids'][0][:50])
+    # print("First token:", summary_inputs['input_ids'][0][0])  # Should be BOS token if used
+    # print("Sample sequence:", summary_inputs['input_ids'][0][:50])
 
     # Verify no empty sequences
-    print("Any empty sequences?", (summary_inputs['attention_mask'].sum(dim=1) == 0).any())
+    # print("Any empty sequences?", (summary_inputs['attention_mask'].sum(dim=1) == 0).any())
 
     # Check for numerical issues
-    print("Device:", summary_inputs['input_ids'].device)
-    print("Dtype:", lm_backbone.dtype)
+    # print("Device:", summary_inputs['input_ids'].device)
+    # print("Dtype:", lm_backbone.dtype)
 
     # You might want to try fp32 instead of bfloat16 to test if it's a precision issue
     # test_output = lm_backbone.float().generate(...)
@@ -1638,7 +1618,7 @@ def generate(
             summary_ids[summary_inputs['input_ids'].shape[1]:],
             skip_special_tokens = True
         ).strip()
-        print("summary follsz:", summary)
+        # print("summary follsz:", summary)
         summary_texts.append(summary)
     processed_scores = []
     for i, score in enumerate(summary_output.scores):
