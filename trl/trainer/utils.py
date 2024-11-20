@@ -1110,19 +1110,17 @@ def get_reward(
         if tokenizer:
             text = tokenizer.decode(valid_tokens)
             system_message = """
-            You are an expert sentiment analyst.
+            You are an expert sentiment analyst of movies.
             """
                 
-            prompt = f"""{system_message}. 1. Prediction: State whether the movie is likely to be "Positive" or "Negative". and mention how confident you are in your prediction [Low, Moderate, High].
-                2. Confidence: Express your confidence as a probability value strictly in this format:
-                - High confidence "Negative": 0.05 
-                - Moderate confidence "Negative": 0.2
-                - Low confidence "Negative": 0.4
-                - Low confidence "Positive": 0.6
-                - Moderate confidence "Positive": 0.8
-                - High confidence "Positive": 0.95
-
-                Please provide your prediction for the following movie: Follow this same template when generating outputs and here is the text to analyze:\n\n{text}:"""
+            prompt = f"""{system_message}. Given {text}, analyze and state whether the movie is likely to be "Positive" or "Negative". Provide the label exactly as one of the following:\n\n"
+            "<label>High confidence "Negative"</label> \n"
+            "<label>Moderate confidence "Negative"</label> \n"
+            "<label>Low confidence "Negative"</label> \n"
+            "<label>High confidence "Positive"</label> \n"
+            "<label>Moderate confidence "Positive"</label> \n"
+            "<label>Low confidence "Positive"</label> \n"
+            "Do not include any additional formatting or characters, just return the label within the <label></label> tags."""
 
 
             summary_prompts.append(prompt)
@@ -1176,7 +1174,7 @@ def get_reward(
             **inputs,
             remove_invalid_values=True,
             # inputs["input_ids"],
-            max_new_tokens=20,  # Adjust based on expected response length
+            max_new_tokens=50,  # Adjust based on expected response length
             min_length = 2,
             num_beams=1,       # Use greedy decoding
             do_sample=True,   # Don't use sampling
