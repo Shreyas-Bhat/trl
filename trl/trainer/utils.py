@@ -1109,11 +1109,11 @@ def get_reward(
         # [attention_mask[i]]
         if tokenizer:
             text = tokenizer.decode(valid_tokens)
-            system_message = """
-            You are an expert sentiment analyst of movies.
-            """
+            # system_message = """
+            # You are an expert sentiment analyst of movies.
+            # """
                 
-            prompt = f"""{system_message}. Given {text}, analyze and state whether the movie is likely to be "Positive" or "Negative". Provide the label exactly as one of the following:\n\n"
+            prompt = f"""You are an expert sentiment analyst of movies. Given {text}, analyze and state whether the movie is likely to be "Positive" or "Negative". Provide the label exactly as one of the following:\n\n"
             "<label>High confidence "Negative"</label> \n"
             "<label>Moderate confidence "Negative"</label> \n"
             "<label>Low confidence "Negative"</label> \n"
@@ -1181,7 +1181,7 @@ def get_reward(
             pad_token_id=tokenizer.pad_token_id,
             top_k = 50,
             top_p = 0.9,
-            temperature = 0.4, 
+            temperature = 0.1, 
             eos_token_id=tokenizer.eos_token_id,
             return_dict_in_generate=True,
             # suppress_tokens=[tokenizer.eos_token_id],

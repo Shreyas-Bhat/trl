@@ -407,8 +407,8 @@ class RLOOTrainer(Trainer):
                     #     print("=" * 50)
                 # sequence_length = first_true_indices(postprocessed_response == processing_class.pad_token_id) - 1 #TODO: changing this line 
                 sequence_length = first_true_indices(postprocessed_response == processing_class.pad_token_id) - 1
-                llm_output = forward(self.llm_decision_maker, postprocessed_query_response, processing_class.pad_token_id) #TODO: changing this line 
-                # llm_output = forward(self.llm_decision_maker, postprocessed_response, processing_class.pad_token_id)
+                # llm_output = forward(self.llm_decision_maker, postprocessed_query_response, processing_class.pad_token_id) #TODO: changing this line 
+                llm_output = forward(self.llm_decision_maker, postprocessed_response, processing_class.pad_token_id)
                 llm_scores = llm_output
                 # print(f"The following are the llm_scores: {llm_scores}")
                 _, score, _ = get_reward(
