@@ -1114,7 +1114,7 @@ def get_reward(
             3. Reply ONLY with the word 'Positive' or 'Negative'
             """
                 
-            prompt = f"{system_message}. This is an example of a movie review with its sentiment prediction: Its not the cast. A finer group of actors, you could not find. Its not the setting... Sentiment: Negative. Follow this same template when generating outputs and here is the text to analyze:\n\n{text}\n\nSentiment:"
+            prompt = f"{system_message}. Follow this same template when generating outputs and here is the text to analyze:\n\n{text}\n\nSentiment:"
 
             summary_prompts.append(prompt)
             texts.append(prompt)
@@ -1174,7 +1174,7 @@ def get_reward(
             pad_token_id=tokenizer.pad_token_id,
             top_k = 50,
             top_p = 0.9,
-            temperature = 0.1, 
+            temperature = 0.4, 
             eos_token_id=tokenizer.eos_token_id,
             return_dict_in_generate=True,
             suppress_tokens=[tokenizer.eos_token_id],
@@ -1515,7 +1515,7 @@ def generate(
     # print("Checking device:", input_ids.device, attention_mask.device)
     # print("input_ids", input_ids)
     original_texts = []
-    tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.2-1B")
+    tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-4k-instruct")
     tokenizer.padding_side = "left"
     # tokenizer.add_special_tokens({'pad_token': '[PAD]'})\
     tokenizer.pad_token = tokenizer.eos_token
@@ -1529,7 +1529,7 @@ def generate(
     for text in original_texts:
         system_message = "You are an expert sentiment analyst skilled in determining whether text is positive or negative. Reply only with 'Positive' or 'Negative'."
         
-        prompt = f"{system_message}. This is an example of a movie review with its sentiment prediction: Its not the cast. A finer group of actors, you could not find. Its not the setting... Sentiment: Negative. Follow this same template when generating outputs and here is the text to analyze:\n\n{text}\n\nSentiment:"
+        prompt = f"{system_message}. Follow this same template when generating outputs and here is the text to analyze:\n\n{text}\n\nSentiment:"
         summary_prompts.append(prompt)
         # summary_prompts.append(prompt)
     # print("summary prompts", summary_prompts)
@@ -1880,7 +1880,6 @@ def decode_and_strip_padding(inputs: torch.Tensor, tokenizer: PreTrainedTokenize
     """
     decoded = tokenizer.batch_decode(inputs, skip_special_tokens=False)
     return [d.replace(tokenizer.pad_token, "") for d in decoded]
-
 
 def generate_model_card(
     base_model: Optional[str],
