@@ -274,7 +274,7 @@ class RLOOTrainer(Trainer):
             bos_token_id=tokenizer.bos_token_id,
             eos_token_id=tokenizer.eos_token_id,
             min_new_tokens=1,
-            max_new_tokens=100,
+            max_new_tokens=200,
             num_return_sequences=1,
             output_scores=True,
             suppress_tokens=[tokenizer.eos_token_id],
@@ -385,44 +385,44 @@ class RLOOTrainer(Trainer):
                     tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-4k-instruct")
                     tokenizer.padding_side = "left"
                     # Decode and print the components separately
-                    if i%10==0:
-                        # print("\n=== Query-Response Components ===")
-                        # print("1. Original Query:")
-                        # print("postprocessed_query_response", postprocessed_query_response)
-                        query_text = tokenizer.batch_decode(query, skip_special_tokens=True)
-                        # for i, q in enumerate(query_text):
-                        #     print(f"Query {i+1}: {q}")
+                    # if i%10==0:
+                    # print("\n=== Query-Response Components ===")
+                    # print("1. Original Query:")
+                    # print("postprocessed_query_response", postprocessed_query_response)
+                    query_text = tokenizer.batch_decode(query, skip_special_tokens=True)
+                    # for i, q in enumerate(query_text):
+                    #     print(f"Query {i+1}: {q}")
 
-                        # print("\n2. Processed Response:")
-                        response_text = tokenizer.batch_decode(postprocessed_response, skip_special_tokens=True)
-                        # for i, r in enumerate(response_text):
-                        #     print(f"Response {i+1}: {r}")
+                    # print("\n2. Processed Response:")
+                    response_text = tokenizer.batch_decode(postprocessed_response, skip_special_tokens=True)
+                    # for i, r in enumerate(response_text):
+                    #     print(f"Response {i+1}: {r}")
 
-                        # print("\n3. Full Concatenated Query-Response:")
-                        # full_text = tokenizer.batch_decode(postprocessed_query_response, skip_special_tokens=True)
-                        # for i, text in enumerate(full_text):
-                        #     print(f"\nPair {i+1}:")
-                        #     print("=" * 50)
-                        #     print(text)
-                        #     print("=" * 50)
-                    # sequence_length = first_true_indices(postprocessed_response == processing_class.pad_token_id) - 1 #TODO: changing this line 
-                    sequence_length = first_true_indices(postprocessed_response == processing_class.pad_token_id) - 1
-                    llm_output = forward(self.llm_decision_maker, postprocessed_query_response, processing_class.pad_token_id) #TODO: changing this line 
-                    # llm_output = forward(self.llm_decision_maker, postprocessed_response, processing_class.pad_token_id)
-                    llm_scores = llm_output
-                    # print(f"The following are the llm_scores: {llm_scores}")
-                    _, score, _ = get_reward(
-                        self.llm_decision_maker, postprocessed_query_response, processing_class.pad_token_id, context_length, llm_scores=llm_scores, ground_truth=ground_truth_batch, tokenizer=AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-4k-instruct")
-                    ) #TODO: changing this line 
-                    # _, score, _ = get_reward(
-                    #     reward_model, postprocessed_response, processing_class.pad_token_id, context_length, llm_scores=llm_scores, ground_truth=ground_truth_batch, tokenizer=AutoTokenizer.from_pretrained("Qwen/Qwen2-0.5B")
-                    # )
-                    responses.append(response)
-                    postprocessed_responses.append(postprocessed_response)
-                    logprobs.append(logprob)
-                    ref_logprobs.append(ref_logprob)
-                    sequence_lengths.append(sequence_length)
-                    scores.append(score)
+                    # print("\n3. Full Concatenated Query-Response:")
+                    # full_text = tokenizer.batch_decode(postprocessed_query_response, skip_special_tokens=True)
+                    # for i, text in enumerate(full_text):
+                    #     print(f"\nPair {i+1}:")
+                    #     print("=" * 50)
+                    #     print(text)
+                    #     print("=" * 50)
+                # sequence_length = first_true_indices(postprocessed_response == processing_class.pad_token_id) - 1 #TODO: changing this line 
+                sequence_length = first_true_indices(postprocessed_response == processing_class.pad_token_id) - 1
+                llm_output = forward(self.llm_decision_maker, postprocessed_query_response, processing_class.pad_token_id) #TODO: changing this line 
+                # llm_output = forward(self.llm_decision_maker, postprocessed_response, processing_class.pad_token_id)
+                llm_scores = llm_output
+                # print(f"The following are the llm_scores: {llm_scores}")
+                _, score, _ = get_reward(
+                    self.llm_decision_maker, postprocessed_query_response, processing_class.pad_token_id, context_length, llm_scores=llm_scores, ground_truth=ground_truth_batch, tokenizer=AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-4k-instruct")
+                ) #TODO: changing this line 
+                # _, score, _ = get_reward(
+                #     reward_model, postprocessed_response, processing_class.pad_token_id, context_length, llm_scores=llm_scores, ground_truth=ground_truth_batch, tokenizer=AutoTokenizer.from_pretrained("Qwen/Qwen2-0.5B")
+                # )
+                responses.append(response)
+                postprocessed_responses.append(postprocessed_response)
+                logprobs.append(logprob)
+                ref_logprobs.append(ref_logprob)
+                sequence_lengths.append(sequence_length)
+                scores.append(score)
                 responses = torch.cat(responses, 0)
                 postprocessed_responses = torch.cat(postprocessed_responses, 0)
                 logprobs = torch.cat(logprobs, 0)
@@ -838,7 +838,7 @@ class RLOOTrainer(Trainer):
         processing_class = self.processing_class
         
         generation_config = GenerationConfig(
-            max_new_tokens=100,
+            max_new_tokens=200,
             do_sample=True, #change
             num_beams=1,
             temperature=0.1,
