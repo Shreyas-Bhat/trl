@@ -1566,9 +1566,17 @@ def generate(
         original_texts.append(text)
     summary_prompts = []
     for text in original_texts:
-        system_message = "You are an expert sentiment analyst skilled in determining whether text is positive or negative. Reply only with 'Positive' or 'Negative'."
+        # system_message = "You are an expert sentiment analyst skilled in determining whether text is positive or negative. Reply only with 'Positive' or 'Negative'."
         
-        prompt = f"{system_message}. Follow this same template when generating outputs and here is the text to analyze:\n\n{text}\n\nSentiment:"
+        # prompt = f"{system_message}. Follow this same template when generating outputs and here is the text to analyze:\n\n{text}\n\nSentiment:"
+        prompt = f"""You are an expert sentiment analyst of movies. Given {text}, analyze and state whether the movie is likely to be "Positive" or "Negative". Provide the label exactly as one of the following:\n\n"
+            "<label>High confidence "Negative"</label> \n"
+            "<label>Moderate confidence "Negative"</label> \n"
+            "<label>Low confidence "Negative"</label> \n"
+            "<label>High confidence "Positive"</label> \n"
+            "<label>Moderate confidence "Positive"</label> \n"
+            "<label>Low confidence "Positive"</label> \n"
+            "Do not include any additional formatting or characters, just return the label within the <label></label> tags."""
         summary_prompts.append(prompt)
         # summary_prompts.append(prompt)
     # print("summary prompts", summary_prompts)
