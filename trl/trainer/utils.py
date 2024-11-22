@@ -1113,14 +1113,15 @@ def get_reward(
             # You are an expert sentiment analyst of movies.
             # """
                 
-            prompt = f"""You are an expert sentiment analyst of movies. Given {text}, analyze and state whether the movie is likely to be "Positive" or "Negative". Provide the label exactly as one of the following:\n\n"
-            "<label>High confidence "Negative"</label> \n"
-            "<label>Moderate confidence "Negative"</label> \n"
-            "<label>Low confidence "Negative"</label> \n"
-            "<label>High confidence "Positive"</label> \n"
-            "<label>Moderate confidence "Positive"</label> \n"
-            "<label>Low confidence "Positive"</label> \n"
-            "Do not include any additional formatting or characters, just return the label within the <label></label> tags."""
+            # prompt = f"""You are an expert sentiment analyst of movies. Given {text}, analyze and state whether the movie is likely to be "Positive" or "Negative". Provide the label exactly as one of the following:\n\n"
+            # "<label>High confidence "Negative"</label> \n"
+            # "<label>Moderate confidence "Negative"</label> \n"
+            # "<label>Low confidence "Negative"</label> \n"
+            # "<label>High confidence "Positive"</label> \n"
+            # "<label>Moderate confidence "Positive"</label> \n"
+            # "<label>Low confidence "Positive"</label> \n"
+            # "Do not include any additional formatting or characters, just return the label within the <label></label> tags."""
+            prompt = f"""{text}"""
 
 
             summary_prompts.append(prompt)
@@ -1554,7 +1555,7 @@ def generate(
     # print("Checking device:", input_ids.device, attention_mask.device)
     # print("input_ids", input_ids)
     original_texts = []
-    tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-4k-instruct")
+    tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.2-1B-Instruct")
     tokenizer.padding_side = "left"
     # tokenizer.add_special_tokens({'pad_token': '[PAD]'})\
     tokenizer.pad_token = tokenizer.eos_token
