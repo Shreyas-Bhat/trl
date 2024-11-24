@@ -1182,7 +1182,7 @@ def get_reward(
             pad_token_id=tokenizer.pad_token_id,
             top_k = 50,
             top_p = 0.9,
-            temperature = 0.1, 
+            temperature = 0.4, 
             eos_token_id=tokenizer.eos_token_id,
             return_dict_in_generate=True,
             # suppress_tokens=[tokenizer.eos_token_id],
