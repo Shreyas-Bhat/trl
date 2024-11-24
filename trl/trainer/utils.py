@@ -1570,7 +1570,7 @@ def generate(
         # system_message = "You are an expert sentiment analyst skilled in determining whether text is positive or negative. Reply only with 'Positive' or 'Negative'."
         
         # prompt = f"{system_message}. Follow this same template when generating outputs and here is the text to analyze:\n\n{text}\n\nSentiment:"
-        prompt = f"""You are an expert analyst of movies. Analyze and state whether the movie is likely to be "Positive" or "Negative" given {example}. Provide the label exactly as one of the following:\n\n"
+        prompt = f"""You are an expert analyst of movies. Analyze and state whether the movie is likely to be "Positive" or "Negative" given {text}. Provide the label exactly as one of the following:\n\n"
             "<label>High confidence "Negative"</label> \n"
             "<label>Moderate confidence "Negative"</label> \n"
             "<label>Low confidence "Negative"</label> \n"
