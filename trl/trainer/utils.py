@@ -1121,7 +1121,14 @@ def get_reward(
             # "<label>Moderate confidence "Positive"</label> \n"
             # "<label>Low confidence "Positive"</label> \n"
             # "Do not include any additional formatting or characters, just return the label within the <label></label> tags."""
-            prompt = f"""You are given a review and strictly answer in one word either "Positive" or "Negative" sentiment for the following review: {' '.join(text.split()[:20])}"""
+            prompt = f"""You are given a review and strictly answer the label exactly as one of the following:\n\n"
+            "<label>High confidence "Negative"</label> \n"
+            "<label>Moderate confidence "Negative"</label> \n"
+            "<label>Low confidence "Negative"</label> \n"
+            "<label>High confidence "Positive"</label> \n"
+            "<label>Moderate confidence "Positive"</label> \n"
+            "<label>Low confidence "Positive"</label> \n"
+            "Do not include any additional formatting or characters, just return the label within the <label></label> tags.: {' '.join(text.split()[:20])}"""
 
 
             summary_prompts.append(prompt)
