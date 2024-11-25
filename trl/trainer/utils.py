@@ -1101,8 +1101,8 @@ def get_reward(
     summary_prompts = []
     generated_texts = []
     for i in range(query_responses.shape[0]):
-        valid_tokens = query_responses[i][context_length:]
-        # valid_tokens = query_responses[i]
+        # valid_tokens = query_responses[i][context_length:]
+        valid_tokens = query_responses[i]
 
 
 
@@ -1192,8 +1192,8 @@ def get_reward(
         generated_texts = []
         for output_ids in generated_outputs.sequences:
             # Get only the newly generated tokens (exclude input prompt)
-            # new_tokens = output_ids[inputs['input_ids'].shape[1]:]
-            new_tokens = output_ids
+            new_tokens = output_ids[inputs['input_ids'].shape[1]:]
+            # new_tokens = output_ids
             generated_text = tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
             generated_texts.append(generated_text)
             
