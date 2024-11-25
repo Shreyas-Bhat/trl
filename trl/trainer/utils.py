@@ -1128,7 +1128,7 @@ def get_reward(
             "<label>High confidence "Positive"</label> \n"
             "<label>Moderate confidence "Positive"</label> \n"
             "<label>Low confidence "Positive"</label> \n"
-            "Do not include any additional formatting or characters, just return the label within the <label></label> tags.: {' '.join(text.split()[:20])}"""
+            "Do not include any additional formatting or characters, just return the label within the <label></label> tags.: {' '.join(text.split()[:50])}"""
 
 
             summary_prompts.append(prompt)
@@ -1189,7 +1189,7 @@ def get_reward(
             pad_token_id=tokenizer.pad_token_id,
             top_k = 50,
             top_p = 0.9,
-            temperature = 0.2, 
+            temperature = 0.4, 
             eos_token_id=tokenizer.eos_token_id,
             return_dict_in_generate=True,
             # suppress_tokens=[tokenizer.eos_token_id],
