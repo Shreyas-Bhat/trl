@@ -1121,7 +1121,7 @@ def get_reward(
             # "<label>Moderate confidence "Positive"</label> \n"
             # "<label>Low confidence "Positive"</label> \n"
             # "Do not include any additional formatting or characters, just return the label within the <label></label> tags."""
-            prompt = f"""Answer in one word either "Positive" or "Negative" for the following review: {text}"""
+            prompt = f"""You are given a review and strictly answer in one word either "Positive" or "Negative" sentiment for the following review: {text}"""
 
 
             summary_prompts.append(prompt)
@@ -1178,7 +1178,7 @@ def get_reward(
             max_new_tokens=50,  # Adjust based on expected response length
             min_length = 2,
             num_beams=1,       # Use greedy decoding
-            # do_sample=True,   # Don't use sampling
+            do_sample=True,   # Don't use sampling
             pad_token_id=tokenizer.pad_token_id,
             top_k = 50,
             top_p = 0.9,
