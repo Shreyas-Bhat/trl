@@ -1182,7 +1182,7 @@ def get_reward(
             **inputs,
             remove_invalid_values=True,
             # inputs["input_ids"],
-            max_new_tokens=50,  # Adjust based on expected response length
+            max_new_tokens=100,  # Adjust based on expected response length
             min_length = 2,
             num_beams=1,       # Use greedy decoding
             do_sample=True,   # Don't use sampling
