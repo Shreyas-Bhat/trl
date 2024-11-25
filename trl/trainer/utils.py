@@ -1178,11 +1178,11 @@ def get_reward(
             max_new_tokens=50,  # Adjust based on expected response length
             min_length = 2,
             num_beams=1,       # Use greedy decoding
-            do_sample=True,   # Don't use sampling
+            # do_sample=True,   # Don't use sampling
             pad_token_id=tokenizer.pad_token_id,
             top_k = 50,
             top_p = 0.9,
-            temperature = 0.4, 
+            temperature = 0.2, 
             eos_token_id=tokenizer.eos_token_id,
             return_dict_in_generate=True,
             # suppress_tokens=[tokenizer.eos_token_id],
