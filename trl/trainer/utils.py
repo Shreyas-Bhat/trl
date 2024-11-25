@@ -1101,8 +1101,8 @@ def get_reward(
     summary_prompts = []
     generated_texts = []
     for i in range(query_responses.shape[0]):
-        # valid_tokens = query_responses[i][context_length:]
-        valid_tokens = query_responses[i]
+        valid_tokens = query_responses[i][context_length:]
+        # valid_tokens = query_responses[i]
 
 
 
@@ -1121,7 +1121,7 @@ def get_reward(
             # "<label>Moderate confidence "Positive"</label> \n"
             # "<label>Low confidence "Positive"</label> \n"
             # "Do not include any additional formatting or characters, just return the label within the <label></label> tags."""
-            prompt = f"""You are given a review and strictly answer in one word either "Positive" or "Negative" sentiment for the following review: {text}"""
+            prompt = f"""You are given a review and strictly answer in one word either "Positive" or "Negative" sentiment for the following review: {' '.join(text.split()[:20])}"""
 
 
             summary_prompts.append(prompt)
