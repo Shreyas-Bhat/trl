@@ -1101,8 +1101,8 @@ def get_reward(
     summary_prompts = []
     generated_texts = []
     for i in range(query_responses.shape[0]):
-        # valid_tokens = query_responses[i][context_length:]
-        valid_tokens = query_responses[i]
+        valid_tokens = query_responses[i][context_length:]
+        # valid_tokens = query_responses[i]
 
 
 
