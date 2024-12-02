@@ -1128,7 +1128,7 @@ def get_reward(
             "<label>High confidence "Positive"</label> \n"
             "<label>Moderate confidence "Positive"</label> \n"
             "<label>Low confidence "Positive"</label> \n"
-            "Do not include any additional formatting or characters, just return the label within the <label></label> tags.: {' '.join(text.split()[:200])}"""
+            "Do not include any additional formatting or characters, just return the label within the <label></label> tags.: {' '.join(text.split()[:300])}"""
 
 
             summary_prompts.append(prompt)
