@@ -1206,8 +1206,8 @@ def get_reward(
         generated_texts = []
         for output_ids in generated_outputs.sequences:
             # Get only the newly generated tokens (exclude input prompt)
-            # new_tokens = output_ids[inputs['input_ids'].shape[1]:]
-            new_tokens = output_ids
+            new_tokens = output_ids[inputs['input_ids'].shape[1]:]
+            # new_tokens = output_ids
             # tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-0.5B")
             generated_text = tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
             generated_texts.append(generated_text)
