@@ -37,6 +37,7 @@ from rich.console import Console # type: ignore
 from rich.table import Table # type: ignore
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import IterableDataset
+import transformers
 from transformers import (
     AutoTokenizer,
     BitsAndBytesConfig,
@@ -52,7 +53,7 @@ from transformers.utils import (
     is_torch_npu_available,
     is_torch_xpu_available,
 )
-
+from transformers import T5Tokenizer
 # torch.cuda.set_device(1)
 from ..import_utils import is_unsloth_available
 # from trl.import_utils import is_unsloth_available
@@ -1092,7 +1093,9 @@ def get_reward(
     attention_mask = query_responses != tokenizer.pad_token_id
     # query_responses = query_responses[attention_mask]
     # query_responses = query_responses[query_responses != tokenizer.eos_token_id]
-    sequence_lengths = first_true_indices(query_responses[:, context_length:] == pad_token_id) - 1 + context_length
+    # sequence_lengths = first_true_indices(query_responses[:, context_length:] == pad_token_id) - 1 + context_length
+    sequence_lengths = first_true_indices(query_responses == pad_token_id) - 1
+
     tokenizer.padding_side = "left"
     tokenizer.pad_token = tokenizer.eos_token
     # Convert tensor to text for LLM processing
@@ -1101,14 +1104,17 @@ def get_reward(
     summary_prompts = []
     generated_texts = []
     for i in range(query_responses.shape[0]):
-        valid_tokens = query_responses[i][context_length:]
-        # valid_tokens = query_responses[i]
+        # valid_tokens = query_responses[i][context_length:]
+        valid_tokens = query_responses[i]
 
 
 
         # [attention_mask[i]]
         if tokenizer:
+            # text = tokenizer.decode(valid_tokens)
+            tokenizer = T5Tokenizer.from_pretrained("t5-small")
             text = tokenizer.decode(valid_tokens)
+            # text = tokenizer.decode(text)
             # system_message = """
             # You are an expert sentiment analyst of movies.
             # """
@@ -1128,9 +1134,10 @@ def get_reward(
             "<label>High confidence "Positive"</label> \n"
             "<label>Moderate confidence "Positive"</label> \n"
             "<label>Low confidence "Positive"</label> \n"
-            "Do not include any additional formatting or characters, just return the label within the <label></label> tags.: {' '.join(text.split()[:300])}"""
+            "Do not include any additional formatting or characters, just return the label within the <label></label> tags.: {text[:300]}"""
 
-
+# text.split()[:300])
+# {' '.join(text[:300])}
             summary_prompts.append(prompt)
             texts.append(prompt)
     # for i in range(query_responses.shape[0]):
@@ -1199,8 +1206,9 @@ def get_reward(
         generated_texts = []
         for output_ids in generated_outputs.sequences:
             # Get only the newly generated tokens (exclude input prompt)
-            new_tokens = output_ids[inputs['input_ids'].shape[1]:]
-            # new_tokens = output_ids
+            # new_tokens = output_ids[inputs['input_ids'].shape[1]:]
+            new_tokens = output_ids
+            # tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-0.5B")
             generated_text = tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
             generated_texts.append(generated_text)
             
@@ -1437,13 +1445,44 @@ def forward(
     attention_mask = query_responses != pad_token_id
     position_ids = attention_mask.cumsum(1) - attention_mask.long()
     input_ids = torch.masked_fill(query_responses, ~attention_mask, 0)
-    return model(
-        input_ids=input_ids,
-        attention_mask=attention_mask,
-        position_ids=position_ids,
-        return_dict=True,
-        output_hidden_states=True,
-    )
+    # return model(
+    #     input_ids=input_ids,
+    #     attention_mask=attention_mask,
+    #     position_ids=position_ids,
+    #     return_dict=True,
+    #     output_hidden_states=True,
+    # )
+    common_kwargs = {
+        "input_ids": input_ids,
+        "attention_mask": attention_mask,
+        "return_dict": True,
+        "output_hidden_states": True
+    }
+    
+    if isinstance(model, transformers.T5ForConditionalGeneration):
+        # T5-specific forward pass
+        decoder_input_ids = model._shift_right(input_ids)
+        return model(
+            decoder_input_ids=decoder_input_ids,
+            **common_kwargs
+        )
+    elif isinstance(model, (transformers.GPT2LMHeadModel, transformers.AutoModelForCausalLM)):
+        # Decoder-only models that use position_ids
+        position_ids = attention_mask.cumsum(1) - attention_mask.long()
+        return model(
+            position_ids=position_ids,
+            **common_kwargs
+        )
+    else:
+        # Default case
+        return model(**common_kwargs)
+    # decoder_input_ids = model._shift_right(input_ids)
+    # return model(
+    #         input_ids=input_ids,
+    #         attention_mask=attention_mask,
+    #         decoder_input_ids=decoder_input_ids,
+    #         return_dict=True
+    #     )
 
 
 def prepare_deepspeed(
@@ -1563,7 +1602,8 @@ def generate(
     # print("Checking device:", input_ids.device, attention_mask.device)
     # print("input_ids", input_ids)
     original_texts = []
-    tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-128k-instruct")
+    # tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-128k-instruct")
+    tokenizer = T5Tokenizer.from_pretrained("t5-small")
     tokenizer.padding_side = "left"
     # tokenizer.add_special_tokens({'pad_token': '[PAD]'})\
     tokenizer.pad_token = tokenizer.eos_token
@@ -1632,7 +1672,7 @@ def generate(
         
     # )
     generation_config = GenerationConfig(
-        max_new_tokens=200,
+        max_new_tokens=100,
         temperature=0.1,
         do_sample=True,
         top_k=50,

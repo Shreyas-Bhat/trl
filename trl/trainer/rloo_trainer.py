@@ -48,7 +48,7 @@ from transformers import (
 from transformers.integrations import get_reporting_integration_callbacks
 from transformers.trainer import DEFAULT_CALLBACKS, DEFAULT_PROGRESS_CALLBACK
 from transformers.trainer_callback import CallbackHandler, ExportableState, PrinterCallback
-
+from transformers import T5Tokenizer
 from ..models.utils import unwrap_model_for_generation
 from ..trainer.utils import (
     OnlineTrainerState,
@@ -71,7 +71,7 @@ if is_wandb_available():
 
 INVALID_LOGPROB = 1.0
 
-
+tokenizer = T5Tokenizer.from_pretrained("t5-small")
 class RLOOTrainer(Trainer):
     _tag_names = ["trl", "rloo"]
 
@@ -264,7 +264,7 @@ class RLOOTrainer(Trainer):
         #     # top_p=0.9,
         #     do_sample=True, #change
         # )
-        tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-128k-instruct")
+        # tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-128k-instruct")
         generation_config =  GenerationConfig(
             temperature=0.1,  # Try with temperature 1.0 first
             top_k=50,
@@ -274,7 +274,7 @@ class RLOOTrainer(Trainer):
             bos_token_id=tokenizer.bos_token_id,
             eos_token_id=tokenizer.eos_token_id,
             min_new_tokens=1,
-            max_new_tokens=200,
+            max_new_tokens=100,
             num_return_sequences=1,
             output_scores=True,
             suppress_tokens=[tokenizer.eos_token_id],
@@ -356,11 +356,15 @@ class RLOOTrainer(Trainer):
                     ground_truth_batch = ground_truth[i: i + args.local_rollout_forward_batch_size]
                     # print("ground_truth_batch ", ground_truth_batch.shape, args.local_rollout_forward_batch_size)
                     query_response = query_responses[i : i + args.local_rollout_forward_batch_size]
-                    response = query_response[:, context_length:]
+                    # response = query_response[:, context_length:]
+                    response = query_response
                     logits = logitss[i : i + args.local_rollout_forward_batch_size]
                     # logits = logits[:, :response.shape[1], :]
+                    min_length = min(logits.shape[1], response.shape[1])
+                    logits = logits[:, :min_length, :]
+                    response = response[:, :min_length]
                     all_logprob = F.log_softmax(logits, dim=-1)
-                    logprob = torch.gather(all_logprob, 2, response.unsqueeze(-1)).squeeze(-1)
+                    logprob = torch.gather(all_logprob, 2, response.unsqueeze(-1)-1).squeeze(-1)
                     # print("log prob and all logprob", all_logprob.shape, logprob.shape) 
                     del logits, all_logprob
                     torch.cuda.empty_cache()
@@ -369,6 +373,9 @@ class RLOOTrainer(Trainer):
                     ref_logits = ref_output.logits[:, context_length - 1 : -1]
                     ref_logits /= args.temperature + 1e-7
                     ref_all_logprob = F.log_softmax(ref_logits, dim=-1)
+                    min_length = min(ref_all_logprob.shape[1], response.shape[1])
+                    ref_all_logprob = ref_all_logprob[:, :min_length, :]
+                    response = response[:, :min_length]
                     ref_logprob = torch.gather(ref_all_logprob, 2, response.unsqueeze(-1)).squeeze(-1)
                     del ref_output, ref_logits, ref_all_logprob
                     torch.cuda.empty_cache()
@@ -382,7 +389,7 @@ class RLOOTrainer(Trainer):
 
                     # Response Processing 2. run reward model on the truncated responses
                     postprocessed_query_response = torch.cat((query, postprocessed_response), 1)
-                    tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-128k-instruct")
+                    # tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-128k-instruct")
                     tokenizer.padding_side = "left"
                     # Decode and print the components separately
                     # if i%10==0:
@@ -413,8 +420,9 @@ class RLOOTrainer(Trainer):
                 # llm_output = forward(self.llm_decision_maker, postprocessed_response, processing_class.pad_token_id)
                 llm_scores = llm_output
                 # print(f"The following are the llm_scores: {llm_scores}")
+                # AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-128k-instruct")
                 _, score, _ = get_reward(
-                    self.llm_decision_maker, postprocessed_query_response, processing_class.pad_token_id, context_length, llm_scores=llm_scores, ground_truth=ground_truth_batch, tokenizer=AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-128k-instruct")
+                    self.llm_decision_maker, postprocessed_query_response, processing_class.pad_token_id, context_length, llm_scores=llm_scores, ground_truth=ground_truth_batch, tokenizer=AutoTokenizer.from_pretrained("Qwen/Qwen2-0.5B")
                 ) #TODO: changing this line 
                 # _, score, _ = get_reward(
                 #     self.llm_decision_maker, postprocessed_response, processing_class.pad_token_id, context_length, llm_scores=llm_scores, ground_truth=ground_truth_batch, tokenizer=AutoTokenizer.from_pretrained("Qwen/Qwen2-0.5B")
@@ -843,7 +851,7 @@ class RLOOTrainer(Trainer):
         processing_class = self.processing_class
         
         generation_config = GenerationConfig(
-            max_new_tokens=200,
+            max_new_tokens=100,
             do_sample=True, #change
             num_beams=1,
             temperature=0.1,
@@ -912,7 +920,9 @@ class RLOOTrainer(Trainer):
                         context_length,
                         llm_scores=llm_scores,
                         ground_truth=ground_truth,
-                        tokenizer=AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-128k-instruct")
+                        # tokenizer=AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-128k-instruct")
+                        tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2-0.5B")
+                        # tokenizer=tokenizer
                     )
                     
                     score_np = score.view(-1).float().cpu().numpy()
