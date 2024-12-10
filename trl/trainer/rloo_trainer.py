@@ -560,7 +560,8 @@ class RLOOTrainer(Trainer):
                     'mean': 0.0
                 }
                 total_params = 0
-                for name, param in model.named_parameters():
+                # for name, param in model.named_parameters():
+                for param in model.parameters():
                     if param.requires_grad:
                         weight_stats['max'] = max(weight_stats['max'], param.max().item())
                         weight_stats['min'] = min(weight_stats['min'], param.min().item())
