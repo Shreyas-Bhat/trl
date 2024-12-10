@@ -1127,14 +1127,14 @@ def get_reward(
             # "<label>Moderate confidence "Positive"</label> \n"
             # "<label>Low confidence "Positive"</label> \n"
             # "Do not include any additional formatting or characters, just return the label within the <label></label> tags."""
-            prompt = f""" You are given a review and strictly answer the label exactly as one of the following in a concise manner in just 5 words:\n\n"
+            prompt = f""" You are given a review: {text[:300]} and strictly label the review exactly as one of the following in a concise manner:\n\n"
             "<label>High confidence "Negative"</label> \n"
             "<label>Moderate confidence "Negative"</label> \n"
             "<label>Low confidence "Negative"</label> \n"
             "<label>High confidence "Positive"</label> \n"
             "<label>Moderate confidence "Positive"</label> \n"
             "<label>Low confidence "Positive"</label> \n"
-            "Do not include any additional formatting or characters, just return the label within the <label></label> tags.: {text[:700]}"""
+            "Do not include any additional formatting or characters, just return the label within the <label></label> tags."""
 
 # text.split()[:300])
 # {' '.join(text[:300])}
@@ -1191,7 +1191,7 @@ def get_reward(
             **inputs,
             remove_invalid_values=True,
             # inputs["input_ids"],
-            max_new_tokens=50,  # Adjust based on expected response length
+            max_new_tokens=100,  # Adjust based on expected response length
             min_length = 2,
             num_beams=1,       # Use greedy decoding
             do_sample=True,   # Don't use sampling
