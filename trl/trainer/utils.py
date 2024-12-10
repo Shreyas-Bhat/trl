@@ -1169,6 +1169,8 @@ def get_reward(
     
     # # tokenizer.padding_side = 'left'
     # # device = next(model.parameters()).device
+    tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.2-1B-Instruct")
+    tokenizer.add_special_tokens({'pad_token': '[PAD]'})
     inputs = tokenizer(texts, return_tensors="pt", padding=True, truncation=True).to(device)
     # model.eval()
     with torch.no_grad():
@@ -1189,7 +1191,7 @@ def get_reward(
             **inputs,
             remove_invalid_values=True,
             # inputs["input_ids"],
-            max_new_tokens=100,  # Adjust based on expected response length
+            max_new_tokens=5,  # Adjust based on expected response length
             min_length = 2,
             num_beams=1,       # Use greedy decoding
             do_sample=True,   # Don't use sampling
@@ -1204,9 +1206,14 @@ def get_reward(
         )
         # Decode the generated sequences
         generated_texts = []
+        input_token_list = []
+        # input_tokens = tokenizer.decode(inputs['input_ids'][0], skip_special_tokens=True).strip()
+        # input_token_list.append(input_tokens)
         for output_ids in generated_outputs.sequences:
             # Get only the newly generated tokens (exclude input prompt)
             new_tokens = output_ids[inputs['input_ids'].shape[1]:]
+            # input_tokens = tokenizer.decode(, skip_special_tokens=True).strip()
+            # input_token_list.append(input_tokens)
             # new_tokens = output_ids
             # tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-0.5B")
             generated_text = tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
@@ -1391,9 +1398,12 @@ def get_reward(
                 (1 - ground_truth) * torch.log(1 - llm_probabilities.abs() + epsilon)
     metrics_data = []
     for i in range(len(generated_texts)):
+        input_token_ids = inputs['input_ids'][i].tolist() 
         token_ids = tokenizer.encode(generated_texts[i], add_special_tokens=False)
+        decoded_input = tokenizer.decode(input_token_ids, skip_special_tokens=True)
         metrics_dict = {
             'input_text': texts[i],
+            'model_input': decoded_input,
             'model_output': generated_texts[i],
             'LLM probabilites': llm_probabilities[i].item(),
             'Ground Truth': ground_truth[i].item(),
@@ -1405,7 +1415,7 @@ def get_reward(
         }
         metrics_data.append(metrics_dict)
     df = pd.DataFrame(metrics_data)
-    filename = f'rewards.csv'
+    filename = f'rewards_t5_2.csv'
     # If file exists, append without headers
     if os.path.exists(filename):
         df.to_csv(filename, mode='a', header=False, index=False)

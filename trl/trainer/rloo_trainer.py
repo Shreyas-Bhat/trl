@@ -364,7 +364,7 @@ class RLOOTrainer(Trainer):
                     logits = logits[:, :min_length, :]
                     response = response[:, :min_length]
                     all_logprob = F.log_softmax(logits, dim=-1)
-                    logprob = torch.gather(all_logprob, 2, response.unsqueeze(-1)-1).squeeze(-1)
+                    logprob = torch.gather(all_logprob, 2, response.unsqueeze(-1)).squeeze(-1)
                     # print("log prob and all logprob", all_logprob.shape, logprob.shape) 
                     del logits, all_logprob
                     torch.cuda.empty_cache()
@@ -422,7 +422,7 @@ class RLOOTrainer(Trainer):
                 # print(f"The following are the llm_scores: {llm_scores}")
                 # AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-128k-instruct")
                 _, score, _ = get_reward(
-                    self.llm_decision_maker, postprocessed_query_response, processing_class.pad_token_id, context_length, llm_scores=llm_scores, ground_truth=ground_truth_batch, tokenizer=AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-128k-instruct")
+                    self.llm_decision_maker, postprocessed_query_response, processing_class.pad_token_id, context_length, llm_scores=llm_scores, ground_truth=ground_truth_batch, tokenizer=AutoTokenizer.from_pretrained("meta-llama/Llama-3.2-1B-Instruct")
                 ) #TODO: changing this line 
                 # _, score, _ = get_reward(
                 #     self.llm_decision_maker, postprocessed_response, processing_class.pad_token_id, context_length, llm_scores=llm_scores, ground_truth=ground_truth_batch, tokenizer=AutoTokenizer.from_pretrained("Qwen/Qwen2-0.5B")
@@ -921,7 +921,7 @@ class RLOOTrainer(Trainer):
                         llm_scores=llm_scores,
                         ground_truth=ground_truth,
                         # tokenizer=AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-128k-instruct")
-                        tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-128k-instruct")
+                        tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.2-1B-Instruct")
                         # tokenizer=tokenizer
                     )
                     
