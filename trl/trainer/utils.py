@@ -1169,7 +1169,7 @@ def get_reward(
     
     # # tokenizer.padding_side = 'left'
     # # device = next(model.parameters()).device
-    tokenizer = AutoTokenizer.from_pretrained("Phi-3-mini-128k-instruct")
+    tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-128k-instruct")
     tokenizer.add_special_tokens({'pad_token': '[PAD]'})
     inputs = tokenizer(texts, return_tensors="pt", padding=True, truncation=True).to(device)
     # model.eval()

@@ -920,7 +920,7 @@ class RLOOTrainer(Trainer):
                         context_length,
                         llm_scores=llm_scores,
                         ground_truth=ground_truth,
-                        tokenizer=AutoTokenizer.from_pretrained("Phi-3-mini-128k-instruct")
+                        tokenizer=AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-128k-instruct")
                         # tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.2-1B-Instruct")
                         # tokenizer=tokenizer
                     )
