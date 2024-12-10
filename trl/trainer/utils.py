@@ -1134,7 +1134,7 @@ def get_reward(
             "<label>High confidence "Positive"</label> \n"
             "<label>Moderate confidence "Positive"</label> \n"
             "<label>Low confidence "Positive"</label> \n"
-            "Do not include any additional formatting or characters, just return the label within the <label></label> tags.: {text[:300]}"""
+            "Do not include any additional formatting or characters, just return the label within the <label></label> tags.: {text[:500]}"""
 
 # text.split()[:300])
 # {' '.join(text[:300])}
