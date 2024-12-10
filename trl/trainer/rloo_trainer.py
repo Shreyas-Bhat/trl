@@ -422,7 +422,7 @@ class RLOOTrainer(Trainer):
                 # print(f"The following are the llm_scores: {llm_scores}")
                 # AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-128k-instruct")
                 _, score, _ = get_reward(
-                    self.llm_decision_maker, postprocessed_query_response, processing_class.pad_token_id, context_length, llm_scores=llm_scores, ground_truth=ground_truth_batch, tokenizer=AutoTokenizer.from_pretrained("Phi-3-mini-128k-instruct")
+                    self.llm_decision_maker, postprocessed_query_response, processing_class.pad_token_id, context_length, llm_scores=llm_scores, ground_truth=ground_truth_batch, tokenizer=AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-128k-instruct")
                 ) #TODO: changing this line 
                 # _, score, _ = get_reward(
                 #     self.llm_decision_maker, postprocessed_response, processing_class.pad_token_id, context_length, llm_scores=llm_scores, ground_truth=ground_truth_batch, tokenizer=AutoTokenizer.from_pretrained("Qwen/Qwen2-0.5B")
