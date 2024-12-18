@@ -1111,9 +1111,9 @@ def get_reward(
 
         # [attention_mask[i]]
         if tokenizer:
-            # text = tokenizer.decode(valid_tokens)
-            tokenizer = T5Tokenizer.from_pretrained("t5-small")
             text = tokenizer.decode(valid_tokens)
+            # tokenizer = T5Tokenizer.from_pretrained("t5-small")
+            # text = tokenizer.decode(valid_tokens)
             # text = tokenizer.decode(text)
             # system_message = """
             # You are an expert sentiment analyst of movies.
@@ -1612,9 +1612,9 @@ def generate(
     # print("Checking device:", input_ids.device, attention_mask.device)
     # print("input_ids", input_ids)
     original_texts = []
-    # tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-128k-instruct")
-    tokenizer = T5Tokenizer.from_pretrained("t5-small")
-    tokenizer.padding_side = "left"
+    tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-128k-instruct")
+    # tokenizer = T5Tokenizer.from_pretrained("t5-small")
+    # tokenizer.padding_side = "left"
     # tokenizer.add_special_tokens({'pad_token': '[PAD]'})\
     tokenizer.pad_token = tokenizer.eos_token
     tokenizer.pad_token_id = tokenizer.eos_token_id

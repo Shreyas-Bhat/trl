@@ -71,7 +71,7 @@ if is_wandb_available():
 
 INVALID_LOGPROB = 1.0
 
-tokenizer = T5Tokenizer.from_pretrained("t5-small")
+# tokenizer = T5Tokenizer.from_pretrained("t5-small")
 class RLOOTrainer(Trainer):
     _tag_names = ["trl", "rloo"]
 
@@ -264,7 +264,7 @@ class RLOOTrainer(Trainer):
         #     # top_p=0.9,
         #     do_sample=True, #change
         # )
-        # tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-128k-instruct")
+        tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-128k-instruct")
         generation_config =  GenerationConfig(
             temperature=0.1,  # Try with temperature 1.0 first
             top_k=50,
