@@ -598,8 +598,8 @@ class RLOOTrainer(Trainer):
             torch.cuda.empty_cache()
             gc.collect()
 
-            # if args.num_sample_generations > 0 and (update - 1) % self.sample_generations_freq == 0:
-            #     self.generate_completions(sampling=True) #TODO: print this back
+            if args.num_sample_generations > 0 and (update - 1) % self.sample_generations_freq == 0:
+                self.generate_completions(sampling=True) #TODO: print this back
 
         # HF trainer specifics
         self.control = self.callback_handler.on_train_end(args, self.state, self.control)
@@ -963,7 +963,12 @@ class RLOOTrainer(Trainer):
                 import pandas as pd
                 temp_df = pd.DataFrame(data)
                 wandb.log({"completions": wandb.Table(dataframe=temp_df)})
-        
+                wandb.log({
+                "overall/mean_score": float(np.mean(scores)),
+                "overall/max_score": float(np.max(scores)),
+                "overall/min_score": float(np.min(scores)),
+                "overall/std_score": float(np.std(scores))
+            })
             return data
 
     def create_model_card(
